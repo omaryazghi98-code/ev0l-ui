@@ -1,0 +1,148 @@
+import { useEffect, useRef, useState, type FormEvent } from 'react'
+import Hls from 'hls.js'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { ContinueCard, EmptyState, EpisodeCard, ErrorState, Icon, MediaCard, MediaRow, PageHeading, Skeleton } from '../components/UI'
+import {
+  API_BASE, STORAGE, addToWatchlist, getCatalog, getEPG, getHistory, getIPTVPlaylist, getMeta, getWatchlist,
+  markSimklEpisode, mediaPath, parseM3U, parseXMLTV, removeFromWatchlist, resolveChannelLogos, saveEPG,
+  savePlaylist, saveProgress, searchCatalog, type EPGData, type Episode, type IPTVChannel, type IPTVPlaylist,
+  type LibraryItem, type MediaType, type Meta, type SearchFilter,
+} from '../lib/ev0l'
+
+type LoadState<T> = { data: T; loading: boolean; error: string }
+function useCatalog(type: MediaType) {
+  const [state, setState] = useState<LoadState<Meta[]>>({ data: [], loading: true, error: '' })
+  const load = () => { setState((s) => ({ ...s, loading: true, error: '' })); getCatalog(type).then((data) => setState({ data, loading: false, error: '' })).catch((e: Error) => setState({ data: [], loading: false, error: e.message })) }
+  useEffect(load, [type])
+  return { ...state, reload: load }
+}
+function GridSkeleton({ count = 12 }: { count?: number }) { return <div className="catalog-grid"><Skeleton count={count}/></div> }
+
+export function HomePage() {
+  const [movies, setMovies] = useState<Meta[]>([]); const [series, setSeries] = useState<Meta[]>([])
+  const [history, setHistory] = useState<LibraryItem[]>([]); const [watchlist, setWatchlist] = useState<LibraryItem[]>([])
+  const [loading, setLoading] = useState(true); const [error, setError] = useState('')
+  const load = () => {
+    setLoading(true); setError('')
+    Promise.allSettled([getCatalog('movie'), getCatalog('series'), getHistory(), getWatchlist()]).then(([m, s, h, w]) => {
+      if (m.status === 'fulfilled') setMovies(m.value); if (s.status === 'fulfilled') setSeries(s.value)
+      if (h.status === 'fulfilled') setHistory(h.value); if (w.status === 'fulfilled') setWatchlist(w.value)
+      if (m.status === 'rejected' && s.status === 'rejected') setError('The catalogue is unavailable right now.')
+      setLoading(false)
+    })
+  }
+  useEffect(load, [])
+  const hero = movies[0] || series[0]
+  const saved: Meta[] = watchlist.map((item) => ({ id: item.mediaId, type: item.type, name: item.name, poster: item.poster }))
+  const recent: Meta[] = history.slice(0, 12).map((item) => ({ id: item.mediaId, type: item.type, name: item.name, poster: item.poster }))
+  if (loading) return <main><section className="hero hero--skeleton"><Skeleton variant="hero"/></section><div className="page-stack"><div className="skeleton-rail"><Skeleton count={6}/></div><div className="skeleton-rail"><Skeleton count={6}/></div></div></main>
+  return <main>{hero && <section className="hero" style={{ '--hero-image': `url("${hero.background || hero.poster || ''}")` } as React.CSSProperties}><div className="hero__wash"/><div className="hero__content"><span className="eyebrow">EV0L PREMIERE</span><h1>{hero.name}</h1><div className="hero__meta"><span>{hero.year || hero.releaseInfo}</span>{hero.imdbRating && <span>★ {hero.imdbRating}</span>}<span>{hero.type === 'series' ? 'Series' : 'Movie'}</span></div><p>{hero.description || 'Discover your next great watch in the EV0L collection.'}</p><div className="hero__actions"><Link className="button button--primary" to={mediaPath(hero)}><Icon name="play"/>View title</Link><Link className="button button--glass" to="/my-list"><Icon name="bookmark"/>My List</Link></div></div><div className="hero__index"><i>01</i><span>Featured tonight</span></div></section>}
+    <div className="page-stack home-stack">{error && <ErrorState message={error} retry={load}/>} {history.length > 0 && <section className="rail-section"><div className="section-title"><h2>Continue Watching</h2><span>Pick up where you left off</span></div><div className="continue-rail">{history.slice(0, 10).map((item) => <ContinueCard item={item} key={`${item.type}-${item.mediaId}-${item.season}`}/>)}</div></section>}<MediaRow title="My List" items={saved} empty="Your list is ready for its first title"/><MediaRow title="Trending Movies" items={movies.slice(0, 16)} numbered/><MediaRow title="Featured Series" items={series.slice(0, 16)}/><MediaRow title="Watch It Again" items={recent}/></div>
+  </main>
+}
+
+export function ListingPage({ type }: { type: MediaType }) {
+  const { data, loading, error, reload } = useCatalog(type)
+  return <main className="page"><PageHeading eyebrow="Explore the collection" title={type === 'movie' ? 'Movies' : 'Series'} detail={type === 'movie' ? 'From modern essentials to timeless stories.' : 'Binge-worthy worlds, one episode at a time.'}/>{error && <ErrorState message={error} retry={reload}/>} {loading ? <GridSkeleton/> : <div className="catalog-grid">{data.map((media) => <MediaCard key={media.id} media={media}/>)}</div>}</main>
+}
+
+function SeasonBrowser({ meta, history }: { meta: Meta; history: LibraryItem[] }) {
+  const episodes = meta.videos || []
+  const seasons = [...new Set(episodes.map((episode) => episode.season).filter((season) => season > 0))].sort((a, b) => a - b)
+  const storageKey = `ev0l-season-${meta.id}`
+  const [season, setSeason] = useState(() => Number(sessionStorage.getItem(storageKey)) || seasons[0] || 1)
+  const selected = episodes.filter((episode) => episode.season === season)
+  const current = history.find((item) => item.mediaId === meta.id && item.season === season)
+  function state(ep: Episode) {
+    if (current?.episode === ep.episode) return 'current' as const
+    if (history.some((item) => item.mediaId === meta.id && item.season === season && (item.episode || 0) > ep.episode)) return 'watched' as const
+    return 'unwatched' as const
+  }
+  if (!episodes.length) return <EmptyState title="Episodes are not available" message="Cinemeta has not published episode metadata for this series."/>
+  return <section className="season-browser"><header><div><span className="eyebrow">Episode guide</span><h2>Season {season}</h2></div><label className="select-wrap"><span>Season</span><select value={season} onChange={(e) => { const next = Number(e.target.value); setSeason(next); sessionStorage.setItem(storageKey, String(next)) }}>{seasons.map((value) => <option value={value} key={value}>Season {value}</option>)}</select></label></header><div className="episode-list">{selected.map((episode) => <EpisodeCard key={episode.id} episode={episode} mediaId={meta.id} state={state(episode)}/>)}</div></section>
+}
+
+export function TitlePage() {
+  const { type = 'movie', id = '' } = useParams(); const mediaType = type as MediaType
+  const [meta, setMeta] = useState<Meta | null>(null); const [history, setHistory] = useState<LibraryItem[]>([]); const [saved, setSaved] = useState(false)
+  const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [busy, setBusy] = useState(false)
+  const load = () => { setLoading(true); setError(''); Promise.allSettled([getMeta(mediaType, id), getHistory(), getWatchlist()]).then(([m, h, w]) => { if (m.status === 'fulfilled') setMeta(m.value); else setError('This title could not be loaded.'); if (h.status === 'fulfilled') setHistory(h.value); if (w.status === 'fulfilled') setSaved(w.value.some((x) => x.mediaId === id && x.type === mediaType)); setLoading(false) }) }
+  useEffect(load, [mediaType, id])
+  async function toggleList() { if (!meta || busy) return; setBusy(true); try { if (saved) await removeFromWatchlist(meta.type, meta.id); else await addToWatchlist(meta); setSaved(!saved) } catch (e) { setError((e as Error).message) } finally { setBusy(false) } }
+  if (loading) return <main className="title-loading"><Skeleton variant="hero"/></main>
+  if (!meta) return <main className="page"><ErrorState title="Title unavailable" message={error} retry={load}/></main>
+  const first = meta.videos?.find((episode) => episode.season > 0); const watch = meta.type === 'series' && first ? `/watch/series/${meta.id}/${first.season}/${first.episode}` : `/watch/movie/${meta.id}`
+  return <main className="title-page"><section className="title-hero" style={{ '--hero-image': `url("${meta.background || meta.poster || ''}")` } as React.CSSProperties}><div className="title-hero__fade"/><div className="title-layout"><div className="title-poster">{meta.poster ? <img src={meta.poster} alt={`${meta.name} poster`}/> : <div className="image-fallback">EV0L</div>}</div><div className="title-copy"><span className="eyebrow">{meta.type === 'series' ? 'EV0L Series' : 'EV0L Feature'}</span><h1>{meta.name}</h1><div className="title-meta"><span>{meta.year || meta.releaseInfo}</span>{meta.imdbRating && <span className="rating">★ {meta.imdbRating}</span>}{meta.runtime && <span>{meta.runtime}</span>}</div>{meta.genres && <div className="genre-list">{meta.genres.slice(0, 5).map((genre) => <span key={genre}>{genre}</span>)}</div>}<p className="title-description">{meta.description || 'No synopsis is available for this title.'}</p><div className="title-actions"><Link className="button button--primary" to={watch}><Icon name="play"/>Watch now</Link><button className="button button--glass" onClick={toggleList} disabled={busy}><Icon name={saved ? 'check' : 'plus'}/>{saved ? 'In My List' : 'My List'}</button></div>{error && <small className="inline-error">{error}</small>}<dl className="credits">{meta.cast?.length ? <><dt>Cast</dt><dd>{meta.cast.slice(0, 6).join(', ')}</dd></> : null}{meta.director?.length ? <><dt>Director</dt><dd>{meta.director.join(', ')}</dd></> : null}</dl></div></div></section>{meta.type === 'series' && <div className="page title-episodes"><SeasonBrowser meta={meta} history={history}/></div>}</main>
+}
+
+export function MyListPage() {
+  const [items, setItems] = useState<LibraryItem[]>([]); const [filter, setFilter] = useState<SearchFilter>('all'); const [loading, setLoading] = useState(true); const [error, setError] = useState('')
+  const load = () => { setLoading(true); getWatchlist().then(setItems).catch((e: Error) => setError(e.message)).finally(() => setLoading(false)) }
+  useEffect(load, [])
+  const shown = filter === 'all' ? items : items.filter((item) => item.type === filter)
+  async function remove(item: LibraryItem) { try { await removeFromWatchlist(item.type, item.mediaId); setItems((all) => all.filter((x) => !(x.type === item.type && x.mediaId === item.mediaId))) } catch (e) { setError((e as Error).message) } }
+  return <main className="page"><PageHeading eyebrow="Saved for later" title="My List" detail="Your personal collection, always within reach."/><FilterTabs value={filter} setValue={setFilter}/>{error && <ErrorState message={error} retry={load}/>} {loading ? <GridSkeleton count={8}/> : shown.length ? <div className="catalog-grid list-grid">{shown.map((item) => <div className="saved-card" key={`${item.type}-${item.mediaId}`}><MediaCard media={{ id: item.mediaId, type: item.type, name: item.name, poster: item.poster }}/><button className="remove-button" onClick={() => remove(item)} aria-label={`Remove ${item.name}`}><Icon name="close"/></button></div>)}</div> : <EmptyState title="Your list is empty" message="Save movies and series from any title page, then find them here." action={<Link to="/movies" className="button button--primary">Browse movies</Link>}/>}</main>
+}
+function FilterTabs({ value, setValue }: { value: SearchFilter; setValue: (value: SearchFilter) => void }) { return <div className="filter-tabs" role="tablist">{(['all', 'movie', 'series'] as SearchFilter[]).map((item) => <button role="tab" aria-selected={value === item} className={value === item ? 'active' : ''} key={item} onClick={() => setValue(item)}>{item === 'all' ? 'All' : item === 'movie' ? 'Movies' : 'Series'}</button>)}</div> }
+
+export function SearchPage() {
+  const [query, setQuery] = useState(''); const [filter, setFilter] = useState<SearchFilter>('all'); const [results, setResults] = useState<Meta[]>([])
+  const [loading, setLoading] = useState(false); const [error, setError] = useState('')
+  const [recent, setRecent] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem(STORAGE.recentSearches) || '[]') } catch { return [] } })
+  useEffect(() => { if (query.trim().length < 2) { setResults([]); return }; setLoading(true); setError(''); const timer = window.setTimeout(() => { searchCatalog(query.trim(), filter).then((data) => { setResults(data); setRecent((current) => { const next = [query.trim(), ...current.filter((item) => item !== query.trim())].slice(0, 6); localStorage.setItem(STORAGE.recentSearches, JSON.stringify(next)); return next }) }).catch((e: Error) => setError(e.message)).finally(() => setLoading(false)) }, 350); return () => window.clearTimeout(timer) }, [query, filter])
+  return <main className="page search-page"><PageHeading eyebrow="Find your next story" title="Search EV0L" detail="Movies and series from the full Cinemeta catalogue."/><div className="search-box"><Icon name="search"/><input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search titles, stories, worlds…" aria-label="Search titles"/>{query && <button onClick={() => setQuery('')} aria-label="Clear search"><Icon name="close"/></button>}</div><FilterTabs value={filter} setValue={setFilter}/>{!query && recent.length > 0 && <section className="recent-searches"><div className="section-title"><h2>Recent searches</h2><button onClick={() => { setRecent([]); localStorage.removeItem(STORAGE.recentSearches) }}>Clear</button></div><div>{recent.map((item) => <button key={item} onClick={() => setQuery(item)}><Icon name="refresh"/>{item}</button>)}</div></section>}{error && <ErrorState message={error}/>} {loading ? <GridSkeleton count={8}/> : query.length >= 2 && (results.length ? <div className="catalog-grid">{results.map((media) => <MediaCard key={`${media.type}-${media.id}`} media={media}/>)}</div> : <EmptyState title="No matching titles" message="Try another title or a broader search term."/>)}</main>
+}
+
+export function WatchPage() {
+  const { type = 'movie', id = '', season = '1', episode = '1' } = useParams(); const mediaType = type as MediaType
+  const [meta, setMeta] = useState<Meta | null>(null); const [loaded, setLoaded] = useState(false); const [sync, setSync] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle')
+  useEffect(() => { getMeta(mediaType, id).then((item) => { setMeta(item); void saveProgress({ type: mediaType, mediaId: id, name: item.name, poster: item.poster, season: +season, episode: +episode }) }).catch(() => setMeta(null)) }, [mediaType, id, season, episode])
+  const videos = meta?.videos || []; const currentIndex = videos.findIndex((v) => v.season === +season && v.episode === +episode); const previous = currentIndex > 0 ? videos[currentIndex - 1] : null; const next = currentIndex >= 0 ? videos[currentIndex + 1] : null
+  const src = mediaType === 'movie' ? `https://vidsrc.to/embed/movie/${id}` : `https://vidsrc.to/embed/tv/${id}/${season}/${episode}`
+  async function syncEpisode() { if (mediaType !== 'series') return; setSync('syncing'); try { await markSimklEpisode(id, +season, +episode); setSync('synced') } catch { setSync('error') } }
+  return <main className="watch-page"><header className="player-header"><Link className="player-back" to={meta ? mediaPath(meta) : '/'}><Icon name="back"/><span>Back to title</span></Link><div><strong>{meta?.name || 'Loading title…'}</strong>{mediaType === 'series' && <span>Season {season} · Episode {episode}</span>}</div><button className={`sync-button sync-button--${sync}`} onClick={syncEpisode} disabled={mediaType !== 'series' || sync === 'syncing'}>{sync === 'syncing' ? 'Syncing…' : sync === 'synced' ? 'Synced to Simkl' : sync === 'error' ? 'Retry Simkl sync' : 'Mark watched'}</button></header><section className="player-stage">{!loaded && <div className="player-loader"><span/><p>Preparing your stream</p></div>}<iframe src={src} title="EV0L Player" allow="autoplay; fullscreen; picture-in-picture" allowFullScreen onLoad={() => setLoaded(true)}/></section><footer className="player-footer"><div><span className="eyebrow">Now playing</span><h1>{meta?.name || 'EV0L'}</h1><p>{mediaType === 'series' ? videos[currentIndex]?.name || `Season ${season}, Episode ${episode}` : meta?.description?.slice(0, 140)}</p></div>{mediaType === 'series' && <div className="episode-nav">{previous ? <Link to={`/watch/series/${id}/${previous.season}/${previous.episode}`}><Icon name="back"/>Previous</Link> : <span/>}{next && <Link to={`/watch/series/${id}/${next.season}/${next.episode}`}>Next episode<Icon name="arrow"/></Link>}</div>}<p className="player-note"><Icon name="info"/>Playback controls and shortcuts inside the video are provided by the external player.</p></footer></main>
+}
+
+function IPTVImport({ onImport, onEPG }: { onImport: (playlist: IPTVPlaylist) => void; onEPG: (data: EPGData) => void }) {
+  const [url, setUrl] = useState(''); const [epgUrl, setEpgUrl] = useState(''); const [error, setError] = useState(''); const [busy, setBusy] = useState(false)
+  async function fromUrl(event: FormEvent) { event.preventDefault(); setBusy(true); setError(''); try { const response = await fetch(url); if (!response.ok) throw new Error(`Playlist download failed (${response.status})`); onImport(parseM3U(await response.text(), new URL(url).hostname)) } catch (e) { setError((e as Error).message) } finally { setBusy(false) } }
+  async function guide(event: FormEvent) { event.preventDefault(); setBusy(true); setError(''); try { const response = await fetch(epgUrl); if (!response.ok) throw new Error(`Guide download failed (${response.status})`); onEPG(parseXMLTV(await response.text())) } catch (e) { setError((e as Error).message) } finally { setBusy(false) } }
+  async function file(event: React.ChangeEvent<HTMLInputElement>, kind: 'm3u' | 'epg') { const selected = event.target.files?.[0]; if (!selected) return; try { const text = await selected.text(); if (kind === 'm3u') onImport(parseM3U(text, selected.name)); else onEPG(parseXMLTV(text)) } catch (e) { setError((e as Error).message) } }
+  return <section className="iptv-import"><div className="import-copy"><span className="eyebrow">Bring your provider</span><h2>Import Live TV</h2><p>Your M3U and XMLTV data stays in this browser. EV0L uses your existing server for compatible HLS conversion.</p></div><div className="import-forms"><form onSubmit={fromUrl}><label>M3U / M3U8 playlist URL</label><div><input type="url" required value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://provider.example/playlist.m3u"/><button disabled={busy} className="button button--primary">Import</button></div></form><label className="file-button"><Icon name="upload"/>Choose playlist file<input hidden type="file" accept=".m3u,.m3u8,text/plain" onChange={(e) => file(e, 'm3u')}/></label><form onSubmit={guide}><label>XMLTV guide URL <small>optional</small></label><div><input type="url" required value={epgUrl} onChange={(e) => setEpgUrl(e.target.value)} placeholder="https://provider.example/guide.xml"/><button disabled={busy} className="button button--subtle">Add guide</button></div></form><label className="file-button"><Icon name="upload"/>Choose XMLTV file<input hidden type="file" accept=".xml,.xmltv,text/xml" onChange={(e) => file(e, 'epg')}/></label>{error && <small className="inline-error">{error}</small>}</div></section>
+}
+
+export function IPTVPage() {
+  const [playlist, setPlaylist] = useState<IPTVPlaylist | null>(getIPTVPlaylist); const [epg, setEpg] = useState<EPGData>(getEPG); const [group, setGroup] = useState('All'); const [query, setQuery] = useState('')
+  async function imported(value: IPTVPlaylist) { const channels = await resolveChannelLogos(value.channels); const next = { ...value, channels }; savePlaylist(next); setPlaylist(next) }
+  function guide(data: EPGData) { saveEPG(data); setEpg(data) }
+  const groups = playlist ? ['All', ...new Set(playlist.channels.map((channel) => channel.group))] : []
+  const channels = playlist?.channels.filter((channel) => (group === 'All' || channel.group === group) && channel.name.toLowerCase().includes(query.toLowerCase())) || []
+  return <main className="page iptv-page"><PageHeading eyebrow="Live channels" title="Live TV" detail="Your channels, groups, and programme guide in one focused view." action={playlist && <button className="button button--subtle" onClick={() => setPlaylist(null)}><Icon name="upload"/>Import another</button>}/>{!playlist ? <IPTVImport onImport={imported} onEPG={guide}/> : <div className="tv-layout"><aside className="tv-sidebar"><div className="playlist-label"><span className="live-dot"/><div><strong>{playlist.name}</strong><small>{playlist.channels.length} channels · {epg.programs.length ? 'Guide loaded' : 'No guide'}</small></div></div><nav>{groups.map((name) => <button className={group === name ? 'active' : ''} onClick={() => setGroup(name)} key={name}><span>{name}</span><small>{name === 'All' ? playlist.channels.length : playlist.channels.filter((channel) => channel.group === name).length}</small></button>)}</nav></aside><section className="channel-panel"><div className="channel-toolbar"><div className="search-box search-box--small"><Icon name="search"/><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search channels"/></div><span>{channels.length} channels</span></div>{channels.length ? <div className="channel-grid">{channels.map((channel) => <ChannelCard channel={channel} epg={epg} key={channel.id}/>)}</div> : <EmptyState title="No channels found" message="Try another group or search term."/>}</section></div>}</main>
+}
+function ChannelCard({ channel, epg }: { channel: IPTVChannel; epg: EPGData }) {
+  const [now] = useState(() => Date.now())
+  const timestamp = (value: string) => { const match = value.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/); return match ? Date.UTC(+match[1], +match[2] - 1, +match[3], +match[4], +match[5], +match[6]) : 0 }
+  const ids = [channel.tvgId, channel.tvgName].filter(Boolean)
+  const current = epg.programs.find((item) => ids.includes(item.channelId) && timestamp(item.start) <= now && timestamp(item.stop) > now)
+  return <Link className="channel-card" to={`/iptv/watch/${encodeURIComponent(channel.id)}`}><span className="channel-logo">{channel.logo ? <img src={channel.logo} alt="" loading="lazy"/> : channel.name.slice(0, 2).toUpperCase()}</span><span className="channel-copy"><strong>{channel.name}</strong><small>{current?.title || channel.group}</small></span><span className="channel-live"><i/>LIVE</span><Icon name="play"/></Link>
+}
+function HLSVideo({ src }: { src: string }) {
+  const ref = useRef<HTMLVideoElement>(null); const [error, setError] = useState('')
+  useEffect(() => { const video = ref.current; if (!video) return; let hls: Hls | null = null; if (video.canPlayType('application/vnd.apple.mpegurl')) video.src = src; else if (Hls.isSupported()) { hls = new Hls(); hls.loadSource(src); hls.attachMedia(video); hls.on(Hls.Events.ERROR, (_, data) => { if (data.fatal) setError('This channel could not be played.') }) } else setError('HLS playback is not supported by this browser.'); return () => hls?.destroy() }, [src])
+  return <>{error && <div className="video-error">{error}</div>}<video ref={ref} controls autoPlay playsInline/></>
+}
+export function IPTVWatchPage() {
+  const { channelId = '' } = useParams(); const playlist = getIPTVPlaylist(); const channel = playlist?.channels.find((item) => item.id === decodeURIComponent(channelId)); const navigate = useNavigate()
+  if (!channel) return <main className="page"><ErrorState title="Channel not found" message="Return to Live TV and choose a channel from your imported playlist." retry={() => navigate('/iptv')}/></main>
+  const streamURL = `${API_BASE}/iptv/hls/${encodeURIComponent(channel.id)}/index.m3u8?mediaURL=${encodeURIComponent(channel.url)}`
+  return <main className="iptv-watch"><header><Link to="/iptv"><Icon name="back"/>All channels</Link><div>{channel.logo && <img src={channel.logo} alt=""/>}<span><strong>{channel.name}</strong><small>{channel.group}</small></span></div><span className="channel-live"><i/>LIVE</span></header><section className="live-stage"><HLSVideo src={streamURL}/></section><footer><div><span className="eyebrow">Now watching</span><h1>{channel.name}</h1><p>Live stream delivered through your existing EV0L IPTV service.</p></div><Link className="button button--subtle" to="/iptv"><Icon name="live"/>Browse channels</Link></footer></main>
+}
+
+export function StatusPage() {
+  const [state, setState] = useState<'checking' | 'online' | 'offline'>('checking'); const [checked, setChecked] = useState<Date | null>(null)
+  const check = () => { setState('checking'); Promise.all([getHistory(), getWatchlist()]).then(() => setState('online')).catch(() => setState('offline')).finally(() => setChecked(new Date())) }
+  useEffect(check, [])
+  return <main className="page status-page"><PageHeading eyebrow="EV0L system" title="Server status" detail="A truthful view of services the frontend can verify through existing integrations." action={<button className="button button--subtle" onClick={check}><Icon name="refresh"/>Check again</button>}/><div className="health-hero"><span className={`health-orb health-orb--${state}`}/><div><span>{state === 'checking' ? 'Checking EV0L server' : state === 'online' ? 'EV0L server is reachable' : 'EV0L server is unavailable'}</span><small>{checked ? `Last checked ${checked.toLocaleTimeString()}` : 'Connecting to library services…'}</small></div></div><div className="health-grid"><HealthCard name="Library & history" status={state} detail={`${API_BASE}/library`}/><HealthCard name="Cinemeta catalogue" status="external" detail="External metadata provider"/><HealthCard name="IPTV / FFmpeg" status="unknown" detail="Verified only when a channel starts"/><HealthCard name="Simkl" status="unknown" detail="Verified only when an episode syncs"/></div><section className="control-panel"><div><span className="eyebrow">Server control</span><h2>Restart EV0L server</h2><p>The current backend exposes no restart or health endpoint. This control stays disabled rather than pretending an action is available.</p></div><button className="button button--subtle" disabled title="No restart endpoint is available">Restart server</button></section></main>
+}
+function HealthCard({ name, status, detail }: { name: string; status: string; detail: string }) { const label = status === 'online' ? 'Operational' : status === 'offline' ? 'Unavailable' : status === 'checking' ? 'Checking' : status === 'external' ? 'External service' : 'Not confirmed'; return <article className="health-card"><span className={`status-dot status-dot--${status}`}/><div><h3>{name}</h3><p>{detail}</p></div><strong>{label}</strong></article> }
+export function NotFoundPage() { return <main className="page not-found"><span>404</span><h1>This story isn't here.</h1><p>The page may have moved, or the address may be incomplete.</p><Link className="button button--primary" to="/"><Icon name="home"/>Return home</Link></main> }
