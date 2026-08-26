@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { EVOL_POWER_API_URL } from '../config'
-import { Icon } from './UI'
 
 type WakeLockSentinelLike = {
   released?: boolean
@@ -15,8 +14,12 @@ type NavigatorWithWakeLock = Navigator & {
   }
 }
 
-type FullscreenElement = HTMLElement & {
+type FullscreenTarget = HTMLElement & {
   webkitRequestFullscreen?: () => Promise<void> | void
+}
+
+type FullscreenDocument = Document & {
+  webkitFullscreenElement?: Element
 }
 
 const RIVESTREAM_BASE = 'https://watch.rivestream.app/embed'
@@ -76,11 +79,16 @@ export default function PlaybackManager() {
   const [hasIframe, setHasIframe] = useState(false)
   const [fullscreen, setFullscreen] = useState(false)
   const wakeLockRef = useRef<WakeLockSentinelLike | null>(null)
+  const nativeVideoCleanupRef = useRef<(() => void) | null>(null)
+  const nativeVideoRef = useRef<HTMLVideoElement | null>(null)
 
   useEffect(() => {
     if (!isWatchRoute) {
       setHasIframe(false)
       setFullscreen(false)
+      nativeVideoCleanupRef.current?.()
+      nativeVideoCleanupRef.current = null
+      nativeVideoRef.current = null
       return
     }
 
@@ -118,13 +126,16 @@ export default function PlaybackManager() {
           wakeLockRef.current = null
         })
       } catch {
-        // Browser may require a user activation or may not support wake lock.
+        // Browser may require user activation or may not support wake lock.
       }
     }
 
     const configureIframe = () => {
       const iframe = findWatchIframe()
-      if (!iframe) return false
+      if (!iframe) {
+        setHasIframe(false)
+        return
+      }
 
       iframe.setAttribute('allowfullscreen', 'true')
       iframe.setAttribute(
@@ -137,7 +148,6 @@ export default function PlaybackManager() {
       }
 
       setHasIframe(true)
-      return true
     }
 
     const activity = () => {
@@ -155,20 +165,19 @@ export default function PlaybackManager() {
     }
 
     const onFullscreenChange = () => {
-      const active = Boolean(document.fullscreenElement)
+      const doc = document as FullscreenDocument
+      const active = Boolean(document.fullscreenElement || doc.webkitFullscreenElement)
       setFullscreen(active)
       void reportActivity(active ? 'fullscreen-enter' : 'fullscreen-exit')
     }
 
-    const onWebkitFullscreenChange = () => {
-      const active = Boolean((document as Document & { webkitFullscreenElement?: Element }).webkitFullscreenElement)
-      setFullscreen(active)
-      void reportActivity(active ? 'fullscreen-enter' : 'fullscreen-exit')
-    }
-
-    const onNativeVideoReady = () => {
+    const attachNativeVideo = () => {
       const video = findNativeVideo()
-      if (!video) return
+      if (!video || video === nativeVideoRef.current) return
+
+      nativeVideoCleanupRef.current?.()
+      nativeVideoCleanupRef.current = null
+      nativeVideoRef.current = video
 
       const onPlay = () => activity()
       const onPlaying = () => activity()
@@ -182,7 +191,7 @@ export default function PlaybackManager() {
       video.addEventListener('ended', onEnded)
       video.addEventListener('timeupdate', onTimeUpdate)
 
-      return () => {
+      nativeVideoCleanupRef.current = () => {
         video.removeEventListener('play', onPlay)
         video.removeEventListener('playing', onPlaying)
         video.removeEventListener('pause', onPause)
@@ -191,29 +200,21 @@ export default function PlaybackManager() {
       }
     }
 
-    configureIframe()
+    const refreshPlayerHooks = () => {
+      configureIframe()
+      attachNativeVideo()
+    }
+
+    refreshPlayerHooks()
     void requestWakeLock()
     void reportActivity('watch-enter')
 
-    const cleanupVideo = onNativeVideoReady()
-
-    const onFrame = () => {
-      configureIframe()
-      const video = findNativeVideo()
-      if (video) {
-        setHasIframe(false)
-      }
-    }
-
-    observer = new MutationObserver(() => {
-      onFrame()
-      onNativeVideoReady()
-    })
+    observer = new MutationObserver(refreshPlayerHooks)
     observer.observe(document.body, { childList: true, subtree: true })
 
     document.addEventListener('visibilitychange', onVisibilityChange)
     document.addEventListener('fullscreenchange', onFullscreenChange)
-    document.addEventListener('webkitfullscreenchange' as never, onWebkitFullscreenChange as EventListener)
+    document.addEventListener('webkitfullscreenchange', onFullscreenChange as EventListener)
     window.addEventListener('pointerdown', activity, { passive: true })
     window.addEventListener('touchstart', activity, { passive: true })
     window.addEventListener('keydown', activity)
@@ -229,10 +230,12 @@ export default function PlaybackManager() {
       stopped = true
       if (heartbeat) window.clearInterval(heartbeat)
       observer?.disconnect()
-      cleanupVideo?.()
+      nativeVideoCleanupRef.current?.()
+      nativeVideoCleanupRef.current = null
+      nativeVideoRef.current = null
       document.removeEventListener('visibilitychange', onVisibilityChange)
       document.removeEventListener('fullscreenchange', onFullscreenChange)
-      document.removeEventListener('webkitfullscreenchange' as never, onWebkitFullscreenChange as EventListener)
+      document.removeEventListener('webkitfullscreenchange', onFullscreenChange as EventListener)
       window.removeEventListener('pointerdown', activity)
       window.removeEventListener('touchstart', activity)
       window.removeEventListener('keydown', activity)
@@ -244,7 +247,7 @@ export default function PlaybackManager() {
   async function requestFullscreen() {
     const iframe = findWatchIframe()
     const video = findNativeVideo()
-    const target = (video || iframe) as FullscreenElement | null
+    const target = (video || iframe) as FullscreenTarget | null
     if (!target) return
 
     try {
@@ -254,7 +257,7 @@ export default function PlaybackManager() {
         await target.webkitRequestFullscreen?.()
       }
     } catch {
-      // iOS/Safari may refuse iframe fullscreen; leave provider-native controls intact.
+      // iOS/Safari may refuse iframe fullscreen; provider-native controls remain available.
     }
 
     await reportActivity('fullscreen-request')
@@ -263,34 +266,32 @@ export default function PlaybackManager() {
   if (!isWatchRoute) return null
 
   return (
-    <>
-      {hasIframe && (
-        <button
-          type="button"
-          onClick={() => void requestFullscreen()}
-          aria-label={fullscreen ? 'Fullscreen active' : 'Enter fullscreen'}
-          title={fullscreen ? 'Fullscreen active' : 'Enter fullscreen'}
-          style={{
-            position: 'fixed',
-            top: '5.75rem',
-            right: '1rem',
-            zIndex: 1200,
-            display: 'grid',
-            placeItems: 'center',
-            width: '2.75rem',
-            height: '2.75rem',
-            border: '1px solid rgba(255,255,255,.16)',
-            borderRadius: '999px',
-            background: 'rgba(9,12,16,.78)',
-            color: 'white',
-            backdropFilter: 'blur(12px)',
-            WebkitBackdropFilter: 'blur(12px)',
-            cursor: 'pointer',
-          }}
-        >
-          <Icon name="expand" />
-        </button>
-      )}
-    </>
+    <button
+      type="button"
+      onClick={() => void requestFullscreen()}
+      aria-label={fullscreen ? 'Fullscreen active' : 'Enter fullscreen'}
+      title={fullscreen ? 'Fullscreen active' : 'Enter fullscreen'}
+      style={{
+        position: 'fixed',
+        top: '5.75rem',
+        right: '1rem',
+        zIndex: 1200,
+        display: hasIframe ? 'grid' : 'none',
+        placeItems: 'center',
+        width: '2.75rem',
+        height: '2.75rem',
+        border: '1px solid rgba(255,255,255,.16)',
+        borderRadius: '999px',
+        background: 'rgba(9,12,16,.78)',
+        color: 'white',
+        fontSize: '1.35rem',
+        lineHeight: 1,
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        cursor: 'pointer',
+      }}
+    >
+      ⛶
+    </button>
   )
 }
