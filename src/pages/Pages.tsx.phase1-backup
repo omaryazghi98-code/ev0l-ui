@@ -12,8 +12,6 @@ import {
   type LibraryItem, type MediaType, type Meta, type SearchFilter,
 } from '../lib/ev0l'
 
-import { getInstalledAddons, normalizeStremioMeta, getCatalog as getAddonCatalog } from '../lib/addonCatalogs'
-
 type LoadState<T> = { data: T; loading: boolean; error: string }
 function useCatalog(type: MediaType) {
   const [state, setState] = useState<LoadState<Meta[]>>({ data: [], loading: true, error: '' })
@@ -121,60 +119,10 @@ export function HomePage() {
   const [loading, setLoading] = useState(true); const [error, setError] = useState('')
   const load = () => {
     setLoading(true); setError('')
-    // Get installed addons synchronously (localStorage read)
-    const installedAddons = getInstalledAddons()
-    // Build the addon catalog loading promise
-    const addonCatalogPromise = (async () => {
-      const addonMetas: Meta[] = []
-      for (const addon of installedAddons) {
-        if (!addon.enabled) continue
-        for (const catalog of addon.catalogs) {
-          try {
-            const response = await getAddonCatalog(addon, catalog)
-            for (const rawMeta of response.metas) {
-              const normalized = normalizeStremioMeta(rawMeta, addon, catalog)
-              addonMetas.push({
-                id: normalized.id,
-                type: normalized.type,
-                name: normalized.name,
-                poster: normalized.poster,
-                year: normalized.year,
-                genres: normalized.genres,
-                description: normalized.description,
-              } as Meta)
-            }
-          } catch (e) {
-            // Graceful failure — skip this catalog
-          }
-        }
-      }
-      return addonMetas
-    })()
-    Promise.allSettled([getCatalog('movie'), getCatalog('series'), getHistory(), getWatchlist(), addonCatalogPromise]).then(([m, s, h, w, addonMetasResult]) => {
+    Promise.allSettled([getCatalog('movie'), getCatalog('series'), getHistory(), getWatchlist()]).then(([m, s, h, w]) => {
       if (m.status === 'fulfilled') setMovies(m.value); if (s.status === 'fulfilled') setSeries(s.value)
       if (h.status === 'fulfilled') setHistory(h.value); if (w.status === 'fulfilled') setWatchlist(w.value)
-      // Handle addon metas — merge with Cinemeta, Cinemeta takes priority by ID
-      const addonMetas = addonMetasResult.status === 'fulfilled' ? addonMetasResult.value : []
-      // For movies: add addon metas whose IDs are not already present
-      if (setMovies) {
-        const existingMovieIds = new Set(movies.map(m => m.id))
-        for (const am of addonMetas.filter(m => m.type === 'movie')) {
-          if (!existingMovieIds.has(am.id)) {
-            setMovies(prev => [...prev, am])
-            existingMovieIds.add(am.id)
-          }
-        }
-      }
-      // For series: add addon metas whose IDs are not already present
-      if (setSeries) {
-        const existingSeriesIds = new Set(series.map(m => m.id))
-        for (const am of addonMetas.filter(m => m.type === 'series')) {
-          if (!existingSeriesIds.has(am.id)) {
-            setSeries(prev => [...prev, am])
-            existingSeriesIds.add(am.id)
-          }
-        }
-      }
+      if (m.status === 'rejected' && s.status === 'rejected') setError('The catalogue is unavailable right now.')
       setLoading(false)
     })
   }
@@ -909,7 +857,7 @@ export function StatusPage() {
   const [state, setState] = useState<'checking' | 'online' | 'offline'>('checking'); const [checked, setChecked] = useState<Date | null>(null)
   const check = () => { setState('checking'); Promise.all([getHistory(), getWatchlist()]).then(() => setState('online')).catch(() => setState('offline')).finally(() => setChecked(new Date())) }
   useEffect(check, [])
-  return <main className="page status-page"><PageHeading eyebrow="EV0L system" title="Server status" detail="A truthful view of services the frontend can verify through existing integrations." action={<button className="button button--subtle" onClick={check}><Icon name="refresh"/>Check again</button>}/><div className="health-hero"><span className={`health-orb health-orb--${state}`}/><div><span>{state === 'checking' ? 'Checking EV0L server' : state === 'online' ? 'EV0L server is reachable' : 'EV0L server is unavailable'}</span><small>{checked ? `Last checked ${checked.toLocaleTimeString()}` : 'Connecting to library services…'}</small></div></div><div className="health-grid"><HealthCard name="Library & history" status={state} detail="EV0L library"/><HealthCard name="Cinemeta catalogue" status="external" detail="External metadata provider"/><HealthCard name="IPTV / FFmpeg" status="unknown" detail="Verified only when a channel starts"/><HealthCard name="Simkl" status="unknown" detail="Verified only when an episode syncs"/></div><GuestInvites />`n      <GhostSentry />
+  return <main className="page status-page"><PageHeading eyebrow="EV0L system" title="Server status" detail="A truthful view of services the frontend can verify through existing integrations." action={<button className="button button--subtle" onClick={check}><Icon name="refresh"/>Check again</button>}/><div className="health-hero"><span className={`health-orb health-orb--${state}`}/><div><span>{state === 'checking' ? 'Checking EV0L server' : state === 'online' ? 'EV0L server is reachable' : 'EV0L server is unavailable'}</span><small>{checked ? `Last checked ${checked.toLocaleTimeString()}` : 'Connecting to library services…'}</small></div></div><div className="health-grid"><HealthCard name="Library & history" status={state} detail={`${API_BASE}/library`}/><HealthCard name="Cinemeta catalogue" status="external" detail="External metadata provider"/><HealthCard name="IPTV / FFmpeg" status="unknown" detail="Verified only when a channel starts"/><HealthCard name="Simkl" status="unknown" detail="Verified only when an episode syncs"/></div><GuestInvites />`n      <GhostSentry />
       <section className="control-panel"><div><span className="eyebrow">Server control</span><h2>Restart EV0L server</h2><p>The current backend exposes no restart or health endpoint. This control stays disabled rather than pretending an action is available.</p></div><button className="button button--subtle" disabled title="No restart endpoint is available">Restart server</button></section></main>
 }
 function HealthCard({ name, status, detail }: { name: string; status: string; detail: string }) { const label = status === 'online' ? 'Operational' : status === 'offline' ? 'Unavailable' : status === 'checking' ? 'Checking' : status === 'external' ? 'External service' : 'Not confirmed'; return <article className="health-card"><span className={`status-dot status-dot--${status}`}/><div><h3>{name}</h3><p>{detail}</p></div><strong>{label}</strong></article> }

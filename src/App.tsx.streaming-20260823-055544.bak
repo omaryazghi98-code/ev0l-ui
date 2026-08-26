@@ -2,9 +2,8 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { RootShell } from './components/Shell'
 import {
   HomePage, IPTVPage, IPTVWatchPage, ListingPage, MyListPage, NotFoundPage,
-  SearchPage, SportsPage, SportsWatchPage, StreamingPage, StatusPage, TitlePage, WatchPage,
+  SearchPage, SportsPage, SportsWatchPage, StatusPage, TitlePage, WatchPage,
 } from './pages/Pages'
-import SettingsPage from './pages/SettingsPage'
 import './styles/globals.css'
 
 export default function App() {
@@ -17,7 +16,6 @@ export default function App() {
     <Route path="/iptv" element={<IPTVPage/>}/>
     <Route path="/iptv/watch/:channelId" element={<IPTVWatchPage/>}/>
     <Route path="/sports" element={<SportsPage/>}/>
-    <Route path="/streaming" element={<StreamingPage/>}/>
     <Route path="/sports/watch/:matchId" element={<SportsWatchPage/>}/>
 
 
@@ -25,8 +23,6 @@ export default function App() {
     <Route path="/watch/:type/:id" element={<WatchPage/>}/>
     <Route path="/watch/:type/:id/:season/:episode" element={<WatchPage/>}/>
     <Route path="/status" element={<StatusPage/>}/>
-    <Route path="/settings" element={<SettingsPage/>}/>
     <Route path="*" element={<NotFoundPage/>}/>
   </Routes></RootShell></BrowserRouter>
 }
-

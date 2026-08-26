@@ -5,3 +5,17 @@ dist/
 .env.*
 *.local
 src/App.tsx.logos-backup
+
+# Local/runtime artifacts
+.cache/
+.config/
+*.log
+process_info.txt
+bash_logout.txt
+gitconfig.txt
+sudo_as_admin_successful
+
+# Temporary generated diff artifacts
+*.diff
+
+guest-invites.json

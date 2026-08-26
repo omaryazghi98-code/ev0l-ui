@@ -1,0 +1,203 @@
+import { useEffect, useState } from 'react'
+import {
+  getGhostSentry,
+  setGhostSentry,
+  type GhostSentryStatus,
+} from '../lib/ev0l'
+
+export default function GhostSentry() {
+  const [status, setStatus] = useState<GhostSentryStatus | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  const load = async () => {
+    try {
+      setError('')
+      setStatus(await getGhostSentry())
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Ghost Sentry is unavailable',
+      )
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void load()
+
+    const timer = window.setInterval(() => {
+      void load()
+    }, 30000)
+
+    return () => window.clearInterval(timer)
+  }, [])
+
+  const toggle = async () => {
+    if (!status || busy) return
+
+    const pin = window.prompt(
+      status.enabled
+        ? 'Enter your EV0L system PIN to disable Ghost Sentry:'
+        : 'Enter your EV0L system PIN to enable Ghost Sentry:',
+    )
+
+    if (pin === null) return
+
+    if (!pin.trim()) {
+      setError('A system PIN is required.')
+      return
+    }
+
+    try {
+      setBusy(true)
+      setError('')
+
+      const next = await setGhostSentry(
+        !status.enabled,
+        pin,
+      )
+
+      setStatus(next)
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Could not update Ghost Sentry',
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const changeAction = async (
+    action: 'sleep' | 'shutdown' | 'restart',
+  ) => {
+    if (!status || busy || status.action === action) return
+
+    const pin = window.prompt(
+      'Enter your EV0L system PIN to change the Ghost Sentry action:',
+    )
+
+    if (pin === null) return
+
+    if (!pin.trim()) {
+      setError('A system PIN is required.')
+      return
+    }
+
+    try {
+      setBusy(true)
+      setError('')
+
+      const response = await fetch(
+        `${window.location.protocol}//${window.location.hostname}:8091/api/system/ghost-sentry`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            enabled: status.enabled,
+            action,
+            pin,
+          }),
+        },
+      )
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error || `Request failed (${response.status})`,
+        )
+      }
+
+      setStatus(data)
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Could not change Ghost Sentry action',
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section className="control-panel">
+      <div>
+        <span className="eyebrow">Smart power</span>
+        <h2>Ghost Sentry</h2>
+
+        <p>
+          Automatically perform a power action after EV0L
+          has been idle for the configured period.
+        </p>
+
+        {loading ? (
+          <small>Checking Ghost Sentry</small>
+        ) : error ? (
+          <small>{error}</small>
+        ) : status ? (
+          <>
+            <small>
+              {status.enabled
+                ? `ARMED  ${status.idleMinutes} min idle  after ${String(status.afterHour).padStart(2, '0')}:00`
+                : 'DISABLED'}
+            </small>
+
+            {status.enabled && (
+              <div style={{ marginTop: '12px' }}>
+                <small>
+                  Current idle: {status.idleMinutesCurrent} min
+                  {'  '}
+                  Action: {status.action}
+                </small>
+              </div>
+            )}
+          </>
+        ) : null}
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        {!loading && status && (
+          <>
+            <select
+              value={status.action}
+              disabled={busy}
+              onChange={(event) =>
+                void changeAction(
+                  event.target.value as
+                    | 'sleep'
+                    | 'shutdown'
+                    | 'restart',
+                )
+              }
+            >
+              <option value="sleep">Sleep</option>
+              <option value="shutdown">Shut down</option>
+              <option value="restart">Restart</option>
+            </select>
+
+            <button
+              className="button button--subtle"
+              disabled={busy}
+              onClick={() => void toggle()}
+            >
+              {busy
+                ? 'Updating'
+                : status.enabled
+                  ? 'Disable Ghost Sentry'
+                  : 'Enable Ghost Sentry'}
+            </button>
+          </>
+        )}
+      </div>
+    </section>
+  )
+}

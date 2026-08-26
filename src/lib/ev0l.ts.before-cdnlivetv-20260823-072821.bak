@@ -1,11 +1,7 @@
 export const CINEMETA = 'https://v3-cinemeta.strem.io'
-import { EVOL_API_URL } from '../config'
+export const API_BASE = `${window.location.protocol}//${window.location.hostname}:11470`
 
-export const API_BASE = EVOL_API_URL
 
-export type MediaType = 'movie' | 'series'
-export type SearchFilter = 'all' | MediaType
-export type Theme = 'dark' | 'light'
 export type SportsMatch = {
   id: string
   sport: 'football' | 'basketball' | 'tennis' | 'other'
@@ -21,6 +17,132 @@ export type SportsMatch = {
   }>
   status?: 'live' | 'scheduled' | 'finished'
 }
+
+type ESPNScoreboard = {
+  events?: Array<{
+    id: string
+    date: string
+    competitions?: Array<{
+      startDate?: string
+      status?: {
+        type?: {
+          state?: string
+        }
+      }
+      competitors?: Array<{
+        homeAway?: 'home' | 'away'
+        team?: {
+          displayName?: string
+        }
+      }>
+      notes?: Array<{
+        headline?: string
+      }>
+    }>
+    league?: {
+      name?: string
+    }
+  }>
+}
+
+const ESPN_SOCCER_SCOREBOARD =
+  'https://site.api.espn.com/apis/site/v2/sports/soccer/all/scoreboard'
+
+function sportsDateParam(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}${month}${day}`
+}
+
+async function getESPNScoreboard(date: Date): Promise<ESPNScoreboard> {
+  const url =
+    `${ESPN_SOCCER_SCOREBOARD}?dates=${sportsDateParam(date)}&limit=500`
+
+  return json<ESPNScoreboard>(
+    await fetch(url),
+    'Sports request'
+  )
+}
+
+export async function getSportsMatches(): Promise<SportsMatch[]> {
+  const today = new Date()
+
+  const dates = [0, 1, 2].map((offset) => {
+    const date = new Date(today)
+    date.setDate(date.getDate() + offset)
+    return date
+  })
+
+  const responses = await Promise.all(
+    dates.map((date) =>
+      getESPNScoreboard(date).catch(() => ({ events: [] }))
+    )
+  )
+
+  const matches: SportsMatch[] = []
+
+  for (const response of responses) {
+    for (const event of response.events ?? []) {
+      const competition = event.competitions?.[0]
+      const competitors = competition?.competitors ?? []
+
+      const home = competitors.find(
+        (item) => item.homeAway === 'home'
+      )
+
+      const away = competitors.find(
+        (item) => item.homeAway === 'away'
+      )
+
+      if (!home?.team?.displayName || !away?.team?.displayName) {
+        continue
+      }
+
+      const state = competition?.status?.type?.state
+
+      const status: SportsMatch['status'] =
+        state === 'in'
+          ? 'live'
+          : state === 'post'
+            ? 'finished'
+            : 'scheduled'
+
+      matches.push({
+        id: `espn-${event.id}`,
+        sport: 'football',
+        competition:
+          event.league?.name ||
+          competition?.notes?.[0]?.headline ||
+          'Football',
+        home: home.team.displayName,
+        away: away.team.displayName,
+        startTime:
+          competition?.startDate ||
+          event.date,
+        streams: [],
+        status,
+      })
+    }
+  }
+
+  const unique = new Map<string, SportsMatch>()
+
+  for (const match of matches) {
+    if (match.status !== 'finished') {
+      unique.set(match.id, match)
+    }
+  }
+
+  return [...unique.values()].sort(
+    (a, b) =>
+      new Date(a.startTime).getTime() -
+      new Date(b.startTime).getTime()
+  )
+}
+export type MediaType = 'movie' | 'series'
+export type SearchFilter = 'all' | MediaType
+export type Theme = 'dark' | 'light'
 
 export type Episode = {
   id: string
@@ -56,7 +178,7 @@ export type LibraryItem = {
   type: MediaType
   mediaId: string
   name: string
-  poster: string
+  poster?: string
   season?: number
   episode?: number
   position: number
@@ -64,33 +186,8 @@ export type LibraryItem = {
   watchedAt?: string
   updatedAt?: string
 }
+
 export type Profile = { id: string; name: string; avatar?: string }
-
-export type GhostSentryStatus = {
-  enabled: boolean
-  idleMinutes: number
-  afterHour: number
-  idleSeconds: number
-  idleMinutesCurrent: number
-  lastActivity: number
-  lastReason: string
-  eligible: boolean
-  action: 'sleep' | 'restart' | 'shutdown'
-}
-
-export type DLHDChannel = {
-  channel_name: string
-  channel_id: string
-  logo_url?: string
-}
-
-export type DLHDEvent = {
-  time?: string
-  event: string
-  channels?: DLHDChannel[]
-  channels2?: DLHDChannel[]
-}
-
 export type IPTVChannel = {
   id: string
   name: string
@@ -142,21 +239,6 @@ async function json<T>(response: Response, label: string): Promise<T> {
   return response.json() as Promise<T>
 }
 
-/**
- * Internal helper: fetch with a 15-second AbortController timeout.
- * Preserves the existing fetch API behavior — on timeout, the underlying
- * fetch rejection is caught by the caller's existing try / catch flow.
- */
-export function fetchWithTimeout(input: RequestInfo, init?: RequestInit, ms = 15000): Promise<Response> {
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), ms)
-  try {
-    return fetch(input, { ...init, signal: controller.signal })
-  } finally {
-    clearTimeout(timeoutId)
-  }
-}
-
 export async function getCatalog(type: MediaType): Promise<Meta[]> {
   const data = await json<{ metas?: Meta[] }>(await fetch(`${CINEMETA}/catalog/${type}/top.json`), 'Catalogue request')
   return data.metas ?? []
@@ -175,33 +257,33 @@ export async function searchCatalog(query: string, filter: SearchFilter): Promis
   return results.flat()
 }
 export async function getWatchlist(): Promise<LibraryItem[]> {
-  const data = await json<{ items?: LibraryItem[] }>(await fetchWithTimeout(`${API_BASE}/library/watchlist`), 'Watchlist request')
+  const data = await json<{ items?: LibraryItem[] }>(await fetch(`${API_BASE}/library/watchlist`), 'Watchlist request')
   return data.items ?? []
 }
 export async function addToWatchlist(meta: Meta) {
-  const response = await fetchWithTimeout(`${API_BASE}/library/watchlist`, {
+  const response = await fetch(`${API_BASE}/library/watchlist`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ type: meta.type, mediaId: meta.id, name: meta.name, poster: meta.poster ?? '' }),
   })
   if (!response.ok) throw new Error(`Add to watchlist failed (${response.status})`)
 }
 export async function removeFromWatchlist(type: string, id: string) {
-  const response = await fetchWithTimeout(`${API_BASE}/library/watchlist/${encodeURIComponent(type)}/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  const response = await fetch(`${API_BASE}/library/watchlist/${encodeURIComponent(type)}/${encodeURIComponent(id)}`, { method: 'DELETE' })
   if (!response.ok) throw new Error(`Remove from watchlist failed (${response.status})`)
 }
 export async function getHistory(): Promise<LibraryItem[]> {
-  const data = await json<{ items?: LibraryItem[] }>(await fetchWithTimeout(`${API_BASE}/library/history`), 'History request')
+  const data = await json<{ items?: LibraryItem[] }>(await fetch(`${API_BASE}/library/history`), 'History request')
   return data.items ?? []
 }
 export async function saveProgress(item: Partial<LibraryItem> & Pick<LibraryItem, 'type' | 'mediaId' | 'name'>) {
-  const response = await fetchWithTimeout(`${API_BASE}/library/history`, {
+  const response = await fetch(`${API_BASE}/library/history`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ...item, poster: item.poster ?? '', season: item.season ?? 0, episode: item.episode ?? 0, position: item.position ?? 0, duration: item.duration ?? 0 }),
   })
   if (!response.ok) throw new Error(`Save history failed (${response.status})`)
 }
 export async function markSimklEpisode(mediaId: string, season: number, episode: number) {
-  const response = await fetchWithTimeout(`${API_BASE}/simkl/episode`, {
+  const response = await fetch(`${API_BASE}/simkl/episode`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ mediaId, season, episode }),
   })
@@ -262,96 +344,6 @@ export function getEPG(): EPGData {
   try { const value = localStorage.getItem(STORAGE.epg); return value ? JSON.parse(value) as EPGData : { channels: {}, programs: [] } } catch { return { channels: {}, programs: [] } }
 }
 
-export async function getGhostSentry(): Promise<GhostSentryStatus> {
-  const response = await fetch(
-    `${window.location.protocol}//${window.location.hostname}:8091/api/system/ghost-sentry`
-  )
-
-  if (!response.ok) {
-    throw new Error(`Ghost Sentry request failed (${response.status})`)
-  }
-
-  return response.json()
-}
-
-export async function setGhostSentry(
-  enabled: boolean,
-  pin: string,
-): Promise<GhostSentryStatus> {
-  const response = await fetch(
-    `${window.location.protocol}//${window.location.hostname}:8091/api/system/ghost-sentry`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        enabled,
-        pin,
-      }),
-    },
-  )
-
-  const data = await response.json()
-
-  if (!response.ok) {
-    throw new Error(data?.error || `Ghost Sentry update failed (${response.status})`)
-  }
-
-  return data
-}
-
-export async function getSportsMatches(): Promise<SportsMatch[]> {
-  const response = await fetchWithTimeout(
-    `${window.location.protocol}//${window.location.hostname}:8090/api/cdnlivetv/sports`,
-  )
-
-  if (!response.ok) {
-    throw new Error(
-      `CDN Live TV sports request failed: ${response.status}`,
-    )
-  }
-
-  const payload = await response.json()
-
-  const events = Array.isArray(payload?.events)
-    ? payload.events
-    : []
-
-  return events
-    .filter(
-      (event: any) =>
-        event?.homeTeam &&
-        event?.awayTeam,
-    )
-    .map((event: any) => ({
-      id: String(event.gameID),
-      home: event.homeTeam,
-      away: event.awayTeam,
-      competition:
-        event.tournament ||
-        event.sport ||
-        'Live Sports',
-      status:
-        event.status === 'LIVE'
-          ? 'live'
-          : event.status === 'FT'
-            ? 'finished'
-            : 'upcoming',
-      startTime: event.start || event.time || '',
-      streams: Array.isArray(event.channels)
-        ? event.channels.map((channel: any) => ({
-            id: `cdn-${channel.id}`,
-            name:
-              channel.channel_name ||
-              'Broadcast',
-            type: 'iframe',
-            url: channel.url,
-          }))
-        : [],
-    }))
-}
-
 function normalizeChannelName(value: string) {
   return value.toLowerCase().replace(/\b(uhd|4k|fhd|hd|sd|hevc|h265|h\.265)\b/gi, '').replace(/[^a-z0-9]+/g, ' ').trim()
 }
@@ -373,3 +365,64 @@ export async function resolveChannelLogos(channels: IPTVChannel[]) {
     return direct ? { ...channel, logo: direct } : channel
   })
 }
+
+
+export type DLHDChannel = {
+  channel_name: string
+  channel_id: string
+  logo_url?: string
+}
+
+export type DLHDEvent = {
+  time?: string
+  event: string
+  channels?: DLHDChannel[]
+  channels2?: DLHDChannel[]
+}
+
+export async function getDLHDChannels(apiKey?: string): Promise<DLHDChannel[]> {
+  const url = apiKey
+    ? `https://dlstreams.st/daddyapi.php?key=${encodeURIComponent(apiKey)}&endpoint=channels`
+    : 'https://dlstreams.st/api.php'
+
+  const response = await fetch(url)
+
+  if (!response.ok) {
+    throw new Error(`DLHD channels failed (${response.status})`)
+  }
+
+  const data = await response.json()
+
+  if (Array.isArray(data)) return data as DLHDChannel[]
+  if (Array.isArray(data?.data)) return data.data as DLHDChannel[]
+
+  return []
+}
+
+export async function getDLHDSchedule(apiKey?: string): Promise<Record<string, Record<string, DLHDEvent[]>>> {
+  if (!apiKey) {
+    throw new Error('DLHD API key is required for schedule endpoint')
+  }
+
+  const url =
+    `https://dlstreams.st/daddyapi.php?key=${encodeURIComponent(apiKey)}&endpoint=schedule`
+
+  const response = await fetch(url)
+
+  if (!response.ok) {
+    throw new Error(`DLHD schedule failed (${response.status})`)
+  }
+
+  const data = await response.json()
+
+  return (data?.data || {}) as Record<string, Record<string, DLHDEvent[]>>
+}
+
+export function getDLHDPlayerUrl(channelId: string, folder = 'stream'): string {
+  const allowed = ['stream', 'cast', 'watch', 'plus', 'casting', 'player']
+
+  const safeFolder = allowed.includes(folder) ? folder : 'stream'
+
+  return `https://dlstreams.st/${safeFolder}/stream-${encodeURIComponent(channelId)}.php`
+}
+

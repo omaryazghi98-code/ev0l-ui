@@ -1,6 +1,3 @@
-import GuestInvites from '../components/GuestInvites'
-import GhostSentry from '../components/GhostSentry'
-import WelcomeBack from '../components/WelcomeBack'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import Hls from 'hls.js'
 import { Link, useNavigate, useParams } from 'react-router-dom'
@@ -11,8 +8,6 @@ import {
   savePlaylist, saveProgress, searchCatalog, type EPGData, type Episode, type IPTVChannel, type IPTVPlaylist,
   type LibraryItem, type MediaType, type Meta, type SearchFilter,
 } from '../lib/ev0l'
-
-import { getInstalledAddons, normalizeStremioMeta, getCatalog as getAddonCatalog } from '../lib/addonCatalogs'
 
 type LoadState<T> = { data: T; loading: boolean; error: string }
 function useCatalog(type: MediaType) {
@@ -121,60 +116,10 @@ export function HomePage() {
   const [loading, setLoading] = useState(true); const [error, setError] = useState('')
   const load = () => {
     setLoading(true); setError('')
-    // Get installed addons synchronously (localStorage read)
-    const installedAddons = getInstalledAddons()
-    // Build the addon catalog loading promise
-    const addonCatalogPromise = (async () => {
-      const addonMetas: Meta[] = []
-      for (const addon of installedAddons) {
-        if (!addon.enabled) continue
-        for (const catalog of addon.catalogs) {
-          try {
-            const response = await getAddonCatalog(addon, catalog)
-            for (const rawMeta of response.metas) {
-              const normalized = normalizeStremioMeta(rawMeta, addon, catalog)
-              addonMetas.push({
-                id: normalized.id,
-                type: normalized.type,
-                name: normalized.name,
-                poster: normalized.poster,
-                year: normalized.year,
-                genres: normalized.genres,
-                description: normalized.description,
-              } as Meta)
-            }
-          } catch (e) {
-            // Graceful failure — skip this catalog
-          }
-        }
-      }
-      return addonMetas
-    })()
-    Promise.allSettled([getCatalog('movie'), getCatalog('series'), getHistory(), getWatchlist(), addonCatalogPromise]).then(([m, s, h, w, addonMetasResult]) => {
+    Promise.allSettled([getCatalog('movie'), getCatalog('series'), getHistory(), getWatchlist()]).then(([m, s, h, w]) => {
       if (m.status === 'fulfilled') setMovies(m.value); if (s.status === 'fulfilled') setSeries(s.value)
       if (h.status === 'fulfilled') setHistory(h.value); if (w.status === 'fulfilled') setWatchlist(w.value)
-      // Handle addon metas — merge with Cinemeta, Cinemeta takes priority by ID
-      const addonMetas = addonMetasResult.status === 'fulfilled' ? addonMetasResult.value : []
-      // For movies: add addon metas whose IDs are not already present
-      if (setMovies) {
-        const existingMovieIds = new Set(movies.map(m => m.id))
-        for (const am of addonMetas.filter(m => m.type === 'movie')) {
-          if (!existingMovieIds.has(am.id)) {
-            setMovies(prev => [...prev, am])
-            existingMovieIds.add(am.id)
-          }
-        }
-      }
-      // For series: add addon metas whose IDs are not already present
-      if (setSeries) {
-        const existingSeriesIds = new Set(series.map(m => m.id))
-        for (const am of addonMetas.filter(m => m.type === 'series')) {
-          if (!existingSeriesIds.has(am.id)) {
-            setSeries(prev => [...prev, am])
-            existingSeriesIds.add(am.id)
-          }
-        }
-      }
+      if (m.status === 'rejected' && s.status === 'rejected') setError('The catalogue is unavailable right now.')
       setLoading(false)
     })
   }
@@ -183,8 +128,7 @@ export function HomePage() {
   const saved: Meta[] = watchlist.map((item) => ({ id: item.mediaId, type: item.type, name: item.name, poster: item.poster }))
   const recent: Meta[] = history.slice(0, 12).map((item) => ({ id: item.mediaId, type: item.type, name: item.name, poster: item.poster }))
   if (loading) return <main><section className="hero hero--skeleton"><Skeleton variant="hero"/></section><div className="page-stack"><div className="skeleton-rail"><Skeleton count={6}/></div><div className="skeleton-rail"><Skeleton count={6}/></div></div></main>
-  return <main>
-    <WelcomeBack item={history[0]} />{hero && <section className="hero" style={{ '--hero-image': `url("${hero.background || hero.poster || ''}")` } as React.CSSProperties}><div className="hero__wash"/><div className="hero__content"><span className="eyebrow">EV0L PREMIERE</span><h1>{hero.name}</h1><div className="hero__meta"><span>{hero.year || hero.releaseInfo}</span>{hero.imdbRating && <span>★ {hero.imdbRating}</span>}<span>{hero.type === 'series' ? 'Series' : 'Movie'}</span></div><p>{hero.description || 'Discover your next great watch in the EV0L collection.'}</p><div className="hero__actions"><Link className="button button--primary" to={mediaPath(hero)}><Icon name="play"/>View title</Link><Link className="button button--glass" to="/my-list"><Icon name="bookmark"/>My List</Link></div></div><div className="hero__index"><i>01</i><span>Featured tonight</span></div></section>}
+  return <main>{hero && <section className="hero" style={{ '--hero-image': `url("${hero.background || hero.poster || ''}")` } as React.CSSProperties}><div className="hero__wash"/><div className="hero__content"><span className="eyebrow">EV0L PREMIERE</span><h1>{hero.name}</h1><div className="hero__meta"><span>{hero.year || hero.releaseInfo}</span>{hero.imdbRating && <span>★ {hero.imdbRating}</span>}<span>{hero.type === 'series' ? 'Series' : 'Movie'}</span></div><p>{hero.description || 'Discover your next great watch in the EV0L collection.'}</p><div className="hero__actions"><Link className="button button--primary" to={mediaPath(hero)}><Icon name="play"/>View title</Link><Link className="button button--glass" to="/my-list"><Icon name="bookmark"/>My List</Link></div></div><div className="hero__index"><i>01</i><span>Featured tonight</span></div></section>}
     <div className="page-stack home-stack">{error && <ErrorState message={error} retry={load}/>} {history.length > 0 && <section className="rail-section"><div className="section-title"><h2>Continue Watching</h2><span>Pick up where you left off</span></div><div className="continue-rail">{history.slice(0, 10).map((item) => <ContinueCard item={item} key={`${item.type}-${item.mediaId}-${item.season}`}/>)}</div></section>}<MediaRow title="My List" items={saved} empty="Your list is ready for its first title"/><MediaRow title="Trending Movies" items={movies.slice(0, 16)} numbered/><MediaRow title="Featured Series" items={series.slice(0, 16)}/><MediaRow title="Watch It Again" items={recent}/></div>
   </main>
 }
@@ -252,7 +196,7 @@ export function WatchPage() {
     ? `https://vidsrc.tw/embed/movie/${id}`
     : `https://vidsrc.tw/embed/tv/${id}/${season}/${episode}?autonext=1`
   async function syncEpisode() { if (mediaType !== 'series') return; setSync('syncing'); try { await markSimklEpisode(id, +season, +episode); setSync('synced') } catch { setSync('error') } }
-  return <main className="watch-page"><header className="player-header"><button type="button" className="player-back" onClick={() => window.history.length > 1 ? navigate(-1) : navigate(meta ? mediaPath(meta) : '/')}><Icon name="back"/><span>Back</span></button><div><strong>{meta?.name || 'Loading title…'}</strong>{mediaType === 'series' && <span>Season {season} · Episode {episode}</span>}</div><button className={`sync-button sync-button--${sync}`} onClick={syncEpisode} disabled={mediaType !== 'series' || sync === 'syncing'}>{sync === 'syncing' ? 'Syncing…' : sync === 'synced' ? 'Synced to Simkl' : sync === 'error' ? 'Retry Simkl sync' : 'Mark watched'}</button></header><section className="player-stage">{!loaded && <div className="player-loader"><span/><p>Preparing your stream</p></div>}<iframe src={src} title="EV0L Player" allow="autoplay; fullscreen; picture-in-picture; encrypted-media" allowFullScreen onLoad={() => setLoaded(true)}/></section><footer className="player-footer"><div><span className="eyebrow">Now playing</span><h1>{meta?.name || 'EV0L'}</h1><p>{mediaType === 'series' ? videos[currentIndex]?.name || `Season ${season}, Episode ${episode}` : meta?.description?.slice(0, 140)}</p></div>{mediaType === 'series' && <div className="episode-nav">{previous ? <Link to={`/watch/series/${id}/${previous.season}/${previous.episode}`}><Icon name="back"/>Previous</Link> : <span/>}{next && <Link to={`/watch/series/${id}/${next.season}/${next.episode}`}>Next episode<Icon name="arrow"/></Link>}</div>}<p className="player-note"><Icon name="info"/>Playback controls and shortcuts inside the video are provided by the external player.</p></footer></main>
+  return <main className="watch-page"><header className="player-header"><button type="button" className="player-back" onClick={() => window.history.length > 1 ? navigate(-1) : navigate(meta ? mediaPath(meta) : '/')}><Icon name="back"/><span>Back</span></button><div><strong>{meta?.name || 'Loading title…'}</strong>{mediaType === 'series' && <span>Season {season} · Episode {episode}</span>}</div><button className={`sync-button sync-button--${sync}`} onClick={syncEpisode} disabled={mediaType !== 'series' || sync === 'syncing'}>{sync === 'syncing' ? 'Syncing…' : sync === 'synced' ? 'Synced to Simkl' : sync === 'error' ? 'Retry Simkl sync' : 'Mark watched'}</button></header><section className="player-stage">{!loaded && <div className="player-loader"><span/><p>Preparing your stream</p></div>}<iframe src={src} title="EV0L Player" allow="autoplay; fullscreen; picture-in-picture" allowFullScreen onLoad={() => setLoaded(true)}/></section><footer className="player-footer"><div><span className="eyebrow">Now playing</span><h1>{meta?.name || 'EV0L'}</h1><p>{mediaType === 'series' ? videos[currentIndex]?.name || `Season ${season}, Episode ${episode}` : meta?.description?.slice(0, 140)}</p></div>{mediaType === 'series' && <div className="episode-nav">{previous ? <Link to={`/watch/series/${id}/${previous.season}/${previous.episode}`}><Icon name="back"/>Previous</Link> : <span/>}{next && <Link to={`/watch/series/${id}/${next.season}/${next.episode}`}>Next episode<Icon name="arrow"/></Link>}</div>}<p className="player-note"><Icon name="info"/>Playback controls and shortcuts inside the video are provided by the external player.</p></footer></main>
 }
 
 function IPTVImport({ onImport, onEPG }: { onImport: (playlist: IPTVPlaylist) => void; onEPG: (data: EPGData) => void }) {
@@ -370,91 +314,41 @@ function AppBackButton({
     </button>
   )
 }
-function getYouTubeVideoId(value: string): string {
-  const input = value.trim()
+function LiveChannelLauncher() {
+  const [provider, setProvider] = useState<'kick' | 'twitch'>('kick')
+  const [username, setUsername] = useState('')
+  const [opened, setOpened] = useState('')
 
-  if (!input) return ''
+  const cleanUsername = username.trim().replace(/^@+/, '')
 
-  if (/^[A-Za-z0-9_-]{6,}$/.test(input)) {
-    return input
+  function openChannel() {
+    if (!cleanUsername) return
+
+    setOpened(cleanUsername)
   }
 
-  try {
-    const url = new URL(input)
-
-    if (url.hostname === 'youtu.be') {
-      return url.pathname.replace(/^\/+/, '').split('/')[0] || ''
-    }
-
-    if (url.hostname.includes('youtube.com')) {
-      const queryId = url.searchParams.get('v')
-
-      if (queryId) return queryId
-
-      const parts = url.pathname.split('/').filter(Boolean)
-
-      const live = parts.indexOf('live')
-      if (live >= 0 && parts[live + 1]) return parts[live + 1]
-
-      const embed = parts.indexOf('embed')
-      if (embed >= 0 && parts[embed + 1]) return parts[embed + 1]
-
-      const shorts = parts.indexOf('shorts')
-      if (shorts >= 0 && parts[shorts + 1]) return parts[shorts + 1]
-    }
-  } catch {}
-
-  return ''
-}
-export function StreamingPage() {
-  const [provider, setProvider] =
-    useState<'youtube' | 'twitch' | 'kick'>('kick')
-
-  const [query, setQuery] = useState('')
-  const [active, setActive] = useState('')
-
-  const username = query.trim().replace(/^@+/, '')
-
-  const watch = () => {
-    if (!username) return
-    setActive(username)
-  }
-
-  const src =
+  const embedUrl =
     provider === 'kick'
-      ? active
-        ? `https://player.kick.com/${encodeURIComponent(active)}`
-        : ''
-      : provider === 'twitch'
-        ? active
-          ? `https://player.twitch.tv/?channel=${encodeURIComponent(active)}&parent=${window.location.hostname}&muted=true`
-          : ''
-        : active
-          ? `https://www.youtube.com/embed/${encodeURIComponent(getYouTubeVideoId(active))}`
-          : ''
-
-  const youtubeId =
-    provider === 'youtube'
-      ? getYouTubeVideoId(active)
-      : ''
+      ? `https://player.kick.com/${encodeURIComponent(cleanUsername)}`
+      : `https://player.twitch.tv/?channel=${encodeURIComponent(cleanUsername)}&parent=${window.location.hostname}&muted=true`
 
   return (
-    <main className="page streaming-page">
-      <PageHeading
-        eyebrow="Live streaming"
-        title="Streaming"
-        detail="Watch live creators and broadcasts from YouTube, Kick, and Twitch."
-      />
+    <section className="sports-channel-launcher">
+      <div className="section-title">
+        <div>
+          <span className="eyebrow">Live channels</span>
+          <h2>Watch a channel</h2>
+        </div>
+      </div>
 
-      <section className="streaming-controls">
-        <div className="streaming-provider-tabs">
+      <div className="sports-channel-controls">
+        <div className="sports-provider-tabs">
           <button
             type="button"
             className={provider === 'kick' ? 'active' : ''}
             onClick={() => {
               setProvider('kick')
-              setQuery('')
-              setActive('')
+              setOpened('')
             }}
           >
             Kick
@@ -465,169 +359,73 @@ export function StreamingPage() {
             className={provider === 'twitch' ? 'active' : ''}
             onClick={() => {
               setProvider('twitch')
-              setQuery('')
-              setActive('')
+              setOpened('')
             }}
           >
             Twitch
           </button>
-
-          <button
-            type="button"
-            className={provider === 'youtube' ? 'active' : ''}
-            onClick={() => {
-              setProvider('youtube')
-              setQuery('')
-              setActive('')
-            }}
-          >
-            YouTube
-          </button>
         </div>
 
-        <div className="streaming-search">
+        <div className="sports-channel-form">
           <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            value={username}
+            onChange={(event) => {
+              setUsername(event.target.value)
+              setOpened('')
+            }}
             onKeyDown={(event) => {
               if (event.key === 'Enter') {
-                watch()
+                openChannel()
               }
             }}
             placeholder={
               provider === 'kick'
-                ? 'Enter Kick username'
-                : provider === 'twitch'
-                  ? 'Enter Twitch username'
-                  : 'Paste YouTube live/video URL or ID'
+                ? 'Kick username'
+                : 'Twitch username'
             }
-            aria-label="Streaming search"
           />
 
           <button
             type="button"
             className="button button--primary"
-            disabled={!username}
-            onClick={watch}
+            onClick={openChannel}
+            disabled={!cleanUsername}
           >
-            <Icon name="play" />
             Watch
           </button>
         </div>
+      </div>
 
-        <div className="streaming-help">
-          {provider === 'kick' && (
-            <span>
-              Example: xqc
-            </span>
-          )}
+      {opened && (
+        <div className="sports-channel-player">
+          {provider === 'twitch' && window.location.protocol !== 'https:' ? (
+            <div className="sports-external">
+              <p>
+                Twitch embeds require HTTPS.
+              </p>
 
-          {provider === 'twitch' && (
-            <span>
-              Example: xqc
-            </span>
-          )}
-
-          {provider === 'youtube' && (
-            <span>
-              Example: https://youtube.com/live/VIDEO_ID
-            </span>
+              <a
+                className="button button--primary"
+                href={`https://www.twitch.tv/${encodeURIComponent(opened)}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Open Twitch
+              </a>
+            </div>
+          ) : (
+            <iframe
+              src={embedUrl}
+              title={`${provider}  ${opened}`}
+              allow="autoplay; fullscreen; picture-in-picture"
+              allowFullScreen
+            />
           )}
         </div>
-      </section>
-
-      {active && (
-        <section className="streaming-player-section">
-          <div className="streaming-player-header">
-            <div>
-              <span className="eyebrow">
-                {provider === 'kick'
-                  ? 'Kick'
-                  : provider === 'twitch'
-                    ? 'Twitch'
-                    : 'YouTube'}
-              </span>
-
-              <h2>{active}</h2>
-            </div>
-
-            <button
-              type="button"
-              className="button button--subtle"
-              onClick={() => setActive('')}
-            >
-              Close
-            </button>
-          </div>
-
-          {!src && provider === 'youtube' && (
-            <EmptyState
-              title="Invalid YouTube URL"
-              message="Paste a YouTube video or live URL, or enter a video ID."
-            />
-          )}
-
-          {provider === 'youtube' && !youtubeId && (
-            <EmptyState
-              title="Invalid YouTube input"
-              message="Use a YouTube video/live URL or video ID."
-            />
-          )}
-
-          {provider === 'twitch' &&
-            window.location.protocol !== 'https:' && (
-              <div className="streaming-external-fallback">
-                <p>
-                  Twitch requires an HTTPS embed environment.
-                </p>
-
-                <a
-                  className="button button--primary"
-                  href={`https://www.twitch.tv/${encodeURIComponent(active)}`}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Open Twitch
-                </a>
-              </div>
-            )}
-
-          {src &&
-            !(
-              provider === 'twitch' &&
-              window.location.protocol !== 'https:'
-            ) &&
-            !(
-              provider === 'youtube' &&
-              !youtubeId
-            ) && (
-              <div className="streaming-player">
-                <iframe
-                  src={src}
-                  title={`${provider} ${active}`}
-                  allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
-                  allowFullScreen
-                />
-              </div>
-            )}
-        </section>
       )}
-
-      {!active && (
-        <section className="streaming-empty">
-          <div>
-            <span className="eyebrow">Choose a platform</span>
-            <h2>Start watching</h2>
-            <p>
-              Enter a channel username or a YouTube video/live URL.
-            </p>
-          </div>
-        </section>
-      )}
-    </main>
+    </section>
   )
 }
-
 export function SportsPage() {
   const [matches, setMatches] = useState<LiveMatch[]>(LIVE_MATCHES)
   const [loading, setLoading] = useState(true)
@@ -746,9 +544,6 @@ export function SportsWatchPage() {
   const { matchId = '' } = useParams()
   const navigate = useNavigate()
   const [matches, setMatches] = useState<LiveMatch[]>(LIVE_MATCHES)
-  const [selectedStream, setSelectedStream] = useState('')
-  const [reloadKey, setReloadKey] = useState(0)
-  const [streamLoading, setStreamLoading] = useState(true)
 
   useEffect(() => {
     let cancelled = false
@@ -771,12 +566,11 @@ export function SportsWatchPage() {
   const match =
     matches.find((item) => item.id === matchId) ||
     LIVE_MATCHES.find((item) => item.id === matchId)
+  const [selectedStream, setSelectedStream] = useState('')
 
   useEffect(() => {
     if (match?.streams.length) {
       setSelectedStream(match.streams[0].id)
-      setReloadKey(0)
-      setStreamLoading(true)
     }
   }, [match])
 
@@ -792,20 +586,7 @@ export function SportsWatchPage() {
     )
   }
 
-  const stream =
-    match.streams.find((item) => item.id === selectedStream) ??
-    match.streams[0]
-
-  function selectStream(id: string) {
-    setSelectedStream(id)
-    setReloadKey(0)
-    setStreamLoading(true)
-  }
-
-  function refreshStream() {
-    setStreamLoading(true)
-    setReloadKey((value) => value + 1)
-  }
+  const stream = match.streams.find((item) => item.id === selectedStream) ?? match.streams[0]
 
   return (
     <main className="sports-watch">
@@ -829,7 +610,7 @@ export function SportsWatchPage() {
             <button
               key={item.id}
               className={item.id === stream?.id ? 'active' : ''}
-              onClick={() => selectStream(item.id)}
+              onClick={() => setSelectedStream(item.id)}
             >
               {item.name}
             </button>
@@ -840,42 +621,18 @@ export function SportsWatchPage() {
       <section className="sports-watch__stage">
         {stream ? (
           stream.type === 'iframe' ? (
-            <>
-              {streamLoading && (
-                <div className="player-loader">
-                  <span />
-                  <p>Connecting to stream</p>
-                </div>
-              )}
-
-              <iframe
-                key={`${stream.id}-${reloadKey}`}
-                src={stream.url}
-                title={`${match.home} vs ${match.away} ${stream.name}`}
-                allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
-                allowFullScreen
-                onLoad={() => setStreamLoading(false)}
-              />
-
-              <div className="sports-stream-controls">
-                <button
-                  type="button"
-                  className="button button--subtle"
-                  onClick={refreshStream}
-                >
-                  <Icon name="refresh" />
-                  Refresh stream
-                </button>
-              </div>
-            </>
+            <iframe
+              src={stream.url}
+              title={`${match.home} vs ${match.away}  ${stream.name}`}
+              allow="autoplay; fullscreen; picture-in-picture"
+              allowFullScreen
+            />
           ) : (
             <div className="sports-external">
               <p>{stream.name}</p>
               <a
                 className="button button--primary"
                 href={stream.url}
-                target="_blank"
-                rel="noreferrer"
               >
                 Open stream
               </a>
@@ -899,34 +656,22 @@ export function SportsWatchPage() {
         </div>
 
         <Link className="button button--subtle" to="/sports">
+          <Icon name="back" />
           Browse matches
         </Link>
       </footer>
     </main>
   )
 }
+
 export function StatusPage() {
   const [state, setState] = useState<'checking' | 'online' | 'offline'>('checking'); const [checked, setChecked] = useState<Date | null>(null)
   const check = () => { setState('checking'); Promise.all([getHistory(), getWatchlist()]).then(() => setState('online')).catch(() => setState('offline')).finally(() => setChecked(new Date())) }
   useEffect(check, [])
-  return <main className="page status-page"><PageHeading eyebrow="EV0L system" title="Server status" detail="A truthful view of services the frontend can verify through existing integrations." action={<button className="button button--subtle" onClick={check}><Icon name="refresh"/>Check again</button>}/><div className="health-hero"><span className={`health-orb health-orb--${state}`}/><div><span>{state === 'checking' ? 'Checking EV0L server' : state === 'online' ? 'EV0L server is reachable' : 'EV0L server is unavailable'}</span><small>{checked ? `Last checked ${checked.toLocaleTimeString()}` : 'Connecting to library services…'}</small></div></div><div className="health-grid"><HealthCard name="Library & history" status={state} detail="EV0L library"/><HealthCard name="Cinemeta catalogue" status="external" detail="External metadata provider"/><HealthCard name="IPTV / FFmpeg" status="unknown" detail="Verified only when a channel starts"/><HealthCard name="Simkl" status="unknown" detail="Verified only when an episode syncs"/></div><GuestInvites />`n      <GhostSentry />
-      <section className="control-panel"><div><span className="eyebrow">Server control</span><h2>Restart EV0L server</h2><p>The current backend exposes no restart or health endpoint. This control stays disabled rather than pretending an action is available.</p></div><button className="button button--subtle" disabled title="No restart endpoint is available">Restart server</button></section></main>
+  return <main className="page status-page"><PageHeading eyebrow="EV0L system" title="Server status" detail="A truthful view of services the frontend can verify through existing integrations." action={<button className="button button--subtle" onClick={check}><Icon name="refresh"/>Check again</button>}/><div className="health-hero"><span className={`health-orb health-orb--${state}`}/><div><span>{state === 'checking' ? 'Checking EV0L server' : state === 'online' ? 'EV0L server is reachable' : 'EV0L server is unavailable'}</span><small>{checked ? `Last checked ${checked.toLocaleTimeString()}` : 'Connecting to library services…'}</small></div></div><div className="health-grid"><HealthCard name="Library & history" status={state} detail={`${API_BASE}/library`}/><HealthCard name="Cinemeta catalogue" status="external" detail="External metadata provider"/><HealthCard name="IPTV / FFmpeg" status="unknown" detail="Verified only when a channel starts"/><HealthCard name="Simkl" status="unknown" detail="Verified only when an episode syncs"/></div><section className="control-panel"><div><span className="eyebrow">Server control</span><h2>Restart EV0L server</h2><p>The current backend exposes no restart or health endpoint. This control stays disabled rather than pretending an action is available.</p></div><button className="button button--subtle" disabled title="No restart endpoint is available">Restart server</button></section></main>
 }
 function HealthCard({ name, status, detail }: { name: string; status: string; detail: string }) { const label = status === 'online' ? 'Operational' : status === 'offline' ? 'Unavailable' : status === 'checking' ? 'Checking' : status === 'external' ? 'External service' : 'Not confirmed'; return <article className="health-card"><span className={`status-dot status-dot--${status}`}/><div><h3>{name}</h3><p>{detail}</p></div><strong>{label}</strong></article> }
 export function NotFoundPage() { return <main className="page not-found"><span>404</span><h1>This story isn't here.</h1><p>The page may have moved, or the address may be incomplete.</p><Link className="button button--primary" to="/"><Icon name="home"/>Return home</Link></main> }
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

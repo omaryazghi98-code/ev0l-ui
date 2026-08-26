@@ -1,7 +1,5 @@
 export const CINEMETA = 'https://v3-cinemeta.strem.io'
-import { EVOL_API_URL } from '../config'
-
-export const API_BASE = EVOL_API_URL
+export const API_BASE = `${window.location.protocol}//${window.location.hostname}:11470`
 
 export type MediaType = 'movie' | 'series'
 export type SearchFilter = 'all' | MediaType
@@ -142,21 +140,6 @@ async function json<T>(response: Response, label: string): Promise<T> {
   return response.json() as Promise<T>
 }
 
-/**
- * Internal helper: fetch with a 15-second AbortController timeout.
- * Preserves the existing fetch API behavior — on timeout, the underlying
- * fetch rejection is caught by the caller's existing try / catch flow.
- */
-export function fetchWithTimeout(input: RequestInfo, init?: RequestInit, ms = 15000): Promise<Response> {
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), ms)
-  try {
-    return fetch(input, { ...init, signal: controller.signal })
-  } finally {
-    clearTimeout(timeoutId)
-  }
-}
-
 export async function getCatalog(type: MediaType): Promise<Meta[]> {
   const data = await json<{ metas?: Meta[] }>(await fetch(`${CINEMETA}/catalog/${type}/top.json`), 'Catalogue request')
   return data.metas ?? []
@@ -175,33 +158,33 @@ export async function searchCatalog(query: string, filter: SearchFilter): Promis
   return results.flat()
 }
 export async function getWatchlist(): Promise<LibraryItem[]> {
-  const data = await json<{ items?: LibraryItem[] }>(await fetchWithTimeout(`${API_BASE}/library/watchlist`), 'Watchlist request')
+  const data = await json<{ items?: LibraryItem[] }>(await fetch(`${API_BASE}/library/watchlist`), 'Watchlist request')
   return data.items ?? []
 }
 export async function addToWatchlist(meta: Meta) {
-  const response = await fetchWithTimeout(`${API_BASE}/library/watchlist`, {
+  const response = await fetch(`${API_BASE}/library/watchlist`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ type: meta.type, mediaId: meta.id, name: meta.name, poster: meta.poster ?? '' }),
   })
   if (!response.ok) throw new Error(`Add to watchlist failed (${response.status})`)
 }
 export async function removeFromWatchlist(type: string, id: string) {
-  const response = await fetchWithTimeout(`${API_BASE}/library/watchlist/${encodeURIComponent(type)}/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  const response = await fetch(`${API_BASE}/library/watchlist/${encodeURIComponent(type)}/${encodeURIComponent(id)}`, { method: 'DELETE' })
   if (!response.ok) throw new Error(`Remove from watchlist failed (${response.status})`)
 }
 export async function getHistory(): Promise<LibraryItem[]> {
-  const data = await json<{ items?: LibraryItem[] }>(await fetchWithTimeout(`${API_BASE}/library/history`), 'History request')
+  const data = await json<{ items?: LibraryItem[] }>(await fetch(`${API_BASE}/library/history`), 'History request')
   return data.items ?? []
 }
 export async function saveProgress(item: Partial<LibraryItem> & Pick<LibraryItem, 'type' | 'mediaId' | 'name'>) {
-  const response = await fetchWithTimeout(`${API_BASE}/library/history`, {
+  const response = await fetch(`${API_BASE}/library/history`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ...item, poster: item.poster ?? '', season: item.season ?? 0, episode: item.episode ?? 0, position: item.position ?? 0, duration: item.duration ?? 0 }),
   })
   if (!response.ok) throw new Error(`Save history failed (${response.status})`)
 }
 export async function markSimklEpisode(mediaId: string, season: number, episode: number) {
-  const response = await fetchWithTimeout(`${API_BASE}/simkl/episode`, {
+  const response = await fetch(`${API_BASE}/simkl/episode`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ mediaId, season, episode }),
   })
@@ -302,7 +285,7 @@ export async function setGhostSentry(
 }
 
 export async function getSportsMatches(): Promise<SportsMatch[]> {
-  const response = await fetchWithTimeout(
+  const response = await fetch(
     `${window.location.protocol}//${window.location.hostname}:8090/api/cdnlivetv/sports`,
   )
 

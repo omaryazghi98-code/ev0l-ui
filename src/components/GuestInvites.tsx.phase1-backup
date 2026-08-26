@@ -1,0 +1,203 @@
+import { useEffect, useState } from 'react'
+import QRCode from 'qrcode'
+
+type Invite = {
+  token: string
+  expiresAt: number
+  createdAt: number
+  host: string
+  guestUrl: string
+}
+
+const API = `http://${window.location.hostname}:8090`
+
+function remaining(expiresAt: number) {
+  const ms = Math.max(0, expiresAt - Date.now())
+  const hours = Math.floor(ms / 3600000)
+  const minutes = Math.floor((ms % 3600000) / 60000)
+
+  if (hours > 0) return `${hours}h ${minutes}m remaining`
+  return `${minutes}m remaining`
+}
+
+export default function GuestInvites() {
+  const [hours, setHours] = useState('24')
+  const [invite, setInvite] = useState<Invite | null>(null)
+  const [qr, setQr] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const [error, setError] = useState('')
+
+  async function createInvite() {
+    setLoading(true)
+    setError('')
+    setCopied(false)
+
+    try {
+      const response = await fetch(
+        `${API}/api/guest/invites?hours=${encodeURIComponent(hours)}`,
+        { method: 'POST' },
+      )
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'Could not create invite')
+      }
+
+      setInvite(data)
+
+      const image = await QRCode.toDataURL(data.guestUrl, {
+        width: 320,
+        margin: 2,
+        errorCorrectionLevel: 'M',
+      })
+
+      setQr(image)
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Could not create invite',
+      )
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function copyLink() {
+    if (!invite) return
+
+    await navigator.clipboard.writeText(invite.guestUrl)
+    setCopied(true)
+
+    window.setTimeout(() => {
+      setCopied(false)
+    }, 1800)
+  }
+
+  async function revoke() {
+    if (!invite) return
+
+    try {
+      await fetch(
+        `${API}/api/guest/invites/${encodeURIComponent(invite.token)}`,
+        { method: 'DELETE' },
+      )
+
+      setInvite(null)
+      setQr('')
+    } catch {
+      setError('Could not revoke invite')
+    }
+  }
+
+  useEffect(() => {
+    if (!invite) return
+
+    const timer = window.setInterval(() => {
+      setInvite((current) => {
+        if (!current) return current
+
+        if (current.expiresAt <= Date.now()) {
+          setQr('')
+          return null
+        }
+
+        return { ...current }
+      })
+    }, 30000)
+
+    return () => window.clearInterval(timer)
+  }, [invite])
+
+  return (
+    <section className="guest-invites">
+      <div className="guest-invites__header">
+        <div>
+          <span className="eyebrow">Guest Access</span>
+          <h2>Invite someone to EV0L</h2>
+          <p>
+            Create a temporary QR invitation for devices connected
+            to your local network.
+          </p>
+        </div>
+      </div>
+
+      <div className="guest-invites__controls">
+        <label>
+          <span>Invitation duration</span>
+
+          <select
+            value={hours}
+            onChange={(event) => setHours(event.target.value)}
+            disabled={loading}
+          >
+            <option value="1">1 hour</option>
+            <option value="6">6 hours</option>
+            <option value="12">12 hours</option>
+            <option value="24">24 hours</option>
+            <option value="48">48 hours</option>
+            <option value="72">72 hours</option>
+            <option value="168">7 days</option>
+          </select>
+        </label>
+
+        <button
+          type="button"
+          className="button button--primary"
+          onClick={createInvite}
+          disabled={loading}
+        >
+          {loading ? 'Creating' : 'Create guest invite'}
+        </button>
+      </div>
+
+      {error && (
+        <p className="inline-error">
+          {error}
+        </p>
+      )}
+
+      {invite && qr && (
+        <div className="guest-invite-card">
+          <div className="guest-invite-card__qr">
+            <img src={qr} alt="Guest invitation QR code" />
+          </div>
+
+          <div className="guest-invite-card__details">
+            <span className="eyebrow">Active invitation</span>
+
+            <h3>Scan to join EV0L</h3>
+
+            <p>
+              {remaining(invite.expiresAt)}
+            </p>
+
+            <code>
+              {invite.guestUrl}
+            </code>
+
+            <div className="guest-invite-card__actions">
+              <button
+                type="button"
+                className="button button--primary"
+                onClick={copyLink}
+              >
+                {copied ? 'Copied!' : 'Copy link'}
+              </button>
+
+              <button
+                type="button"
+                className="button button--subtle"
+                onClick={revoke}
+              >
+                Revoke
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  )
+}
