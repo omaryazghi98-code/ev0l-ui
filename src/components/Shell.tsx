@@ -13,7 +13,6 @@ const NAV = [
   { to: '/streaming', label: 'Streaming', icon: 'play' },
   { to: '/my-list', label: 'My List', icon: 'bookmark' },
   { to: '/settings', label: 'Settings', icon: 'settings' },
-  { to: '/simkl', label: 'Simkl', icon: 'bookmark' },
 ]
 
 export function ProfilePicker({ onSelect }: { onSelect: (profile: Profile) => void }) {
@@ -26,7 +25,18 @@ export function ProfilePicker({ onSelect }: { onSelect: (profile: Profile) => vo
     setProfiles(next)
   }
   return <main className="profile-screen">
-    <div className="profile-ambient profile-ambient--one"/><div className="profile-ambient profile-ambient--two"/><header className="profile-top"><Brand/><span>Personal streaming, evolved.</span></header><section className="profile-panel" aria-labelledby="profile-title"><span className="eyebrow">Choose your space</span><h1 id="profile-title">Who's watching?</h1><p>Your history, queue, and recommendations stay personal.</p><div className="profile-grid">{profiles.map((profile, index) => <button className="profile-card" key={profile.id} onClick={() => onSelect(profile)}><span className={`profile-avatar profile-avatar--${index % 4}`}>{profile.avatar || profile.name[0]}</span><strong>{profile.name}</strong><small>{profile.id === 'omar' ? 'Owner profile' : 'Private session'}</small></button>)}<button className="profile-card profile-card--add" onClick={addGuest}><span className="profile-avatar"><Icon name="plus" size={32}/></span><strong>Add guest</strong><small>Create a new local profile</small></button></div></section><footer className="profile-footer"><span>EV0L</span><span>YOUR SCREEN. YOUR STORY.</span></footer>
+    <div className="profile-ambient profile-ambient--one"/><div className="profile-ambient profile-ambient--two"/>
+    <header className="profile-top"><Brand/><span>Personal streaming, evolved.</span></header>
+    <section className="profile-panel" aria-labelledby="profile-title">
+      <span className="eyebrow">Choose your space</span><h1 id="profile-title">Who's watching?</h1><p>Your history, queue, and recommendations stay personal.</p>
+      <div className="profile-grid">
+        {profiles.map((profile, index) => <button className="profile-card" key={profile.id} onClick={() => onSelect(profile)}>
+          <span className={`profile-avatar profile-avatar--${index % 4}`}>{profile.avatar || profile.name[0]}</span><strong>{profile.name}</strong><small>{profile.id === 'omar' ? 'Owner profile' : 'Private session'}</small>
+        </button>)}
+        <button className="profile-card profile-card--add" onClick={addGuest}><span className="profile-avatar"><Icon name="plus" size={32}/></span><strong>Add guest</strong><small>Create a new local profile</small></button>
+      </div>
+    </section>
+    <footer className="profile-footer"><span>EV0L</span><span>YOUR SCREEN. YOUR STORY.</span></footer>
   </main>
 }
 
@@ -63,7 +73,121 @@ export function AppShell({ profile, onSwitchProfile, children }: { profile: Prof
   return <div className="app-shell">
     {!online && <div className="offline-banner"><Icon name="info"/>You're offline. Cached EV0L screens remain available; video playback requires a connection.</div>}
     <header className="site-header"><Brand compact/><nav className="desktop-nav" aria-label="Primary navigation">{NAV.map((item) => <NavLink key={item.to} to={item.to} end={item.to === '/'}>{item.label}</NavLink>)}</nav>
-      <div className="header-actions"><Link className="icon-button search-button" to="/search" aria-label="Search"><Icon name="search"/></Link><button className="icon-button theme-button" aria-label={`Use ${theme === 'dark' ? 'light' : 'dark'} theme`} onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}><Icon name={theme === 'dark' ? 'sun' : 'moon'}/></button><div className="profile-menu"><button className="profile-trigger" aria-expanded={profileOpen} onClick={() => setProfileOpen(!profileOpen)}><span>{profile.avatar || profile.name[0]}</span><b>{profile.name}</b><Icon name="arrow" size={15}/></button>{profileOpen && <div className="profile-popover"><div><span className="mini-avatar">{profile.avatar || profile.name[0]}</span><p><strong>{profile.name}</strong><small>Active profile</small></p></div><button onClick={onSwitchProfile}><Icon name="user"/>Switch profile</button><Link to="/status"><Icon name="info"/>System status</Link><Link to="/simkl"><Icon name="bookmark"/>Simkl</Link><button onClick={() => setSystemPowerOpen(true)}><Icon name="power"/>System power</button><button onClick={() => setHelpOpen(true)}><kbd>?</kbd>Keyboard shortcuts</button></div>}</div>
+      <div className="header-actions"><Link className="icon-button search-button" to="/search" aria-label="Search"><Icon name="search"/></Link><button className="icon-button theme-button" aria-label={`Use ${theme === 'dark' ? 'light' : 'dark'} theme`} onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}><Icon name={theme === 'dark' ? 'sun' : 'moon'}/></button>
+        <div className="profile-menu"><button className="profile-trigger" aria-expanded={profileOpen} onClick={() => setProfileOpen(!profileOpen)}><span>{profile.avatar || profile.name[0]}</span><b>{profile.name}</b><Icon name="arrow" size={15}/></button>{profileOpen && <div className="profile-popover"><div><span className="mini-avatar">{profile.avatar || profile.name[0]}</span><p><strong>{profile.name}</strong><small>Active profile</small></p></div><button onClick={onSwitchProfile}><Icon name="user"/>Switch profile</button><Link to="/status"><Icon name="info"/>System status</Link><Link to="/simkl"><Icon name="bookmark"/>Simkl</Link><button onClick={() => setSystemPowerOpen(true)}><Icon name="power"/>System power</button><button onClick={() => setHelpOpen(true)}><kbd>?</kbd>Keyboard shortcuts</button></div>}</div>
       </div>
     </header>
     <div className="app-content">{children}</div>
+    <nav className="mobile-nav" aria-label="Mobile navigation">{NAV.map((item) => <NavLink key={item.to} to={item.to} end={item.to === '/'}><Icon name={item.icon}/><span>{item.label.replace('Live TV', 'Live')}</span></NavLink>)}</nav>
+    {systemPowerOpen && <div className="dialog-backdrop" role="presentation" onMouseDown={() => setSystemPowerOpen(false)}>
+  <section className="shortcut-dialog system-power-dialog" role="dialog" aria-modal="true" onMouseDown={(e) => e.stopPropagation()}>
+    <header>
+      <div>
+        <span className="eyebrow">Lenovo system</span>
+        <h2>Power</h2>
+      </div>
+
+      <button className="icon-button" onClick={() => setSystemPowerOpen(false)} aria-label="Close">
+        <Icon name="close"/>
+      </button>
+    </header>
+
+    <div className="system-power-actions">
+
+<button
+        className="system-power-action"
+        onClick={() => {
+          if (inPowerFlight) return
+          setInPowerFlight(true)
+          try {
+            const pin = window.prompt('Enter EV0L system PIN')
+            if (!pin) return
+fetch(`${EVOL_POWER_API_URL}/api/system/power`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'sleep', pin }),
+          })
+          } finally {
+            setInPowerFlight(false)
+          }
+        }}
+      >
+        <Icon name="moon"/>
+        <span>
+          <strong>Sleep</strong>
+          <small>Put the Lenovo to sleep</small>
+        </span>
+      </button>
+
+<button
+        className="system-power-action"
+        onClick={() => {
+          if (inPowerFlight) return
+          if (!window.confirm('Restart the Lenovo?')) return
+          setInPowerFlight(true)
+          try {
+            const pin = window.prompt('Enter EV0L system PIN')
+            if (!pin) return
+
+fetch(`${EVOL_POWER_API_URL}/api/system/power`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'restart', pin }),
+          })
+          } finally {
+            setInPowerFlight(false)
+          }
+        }}
+      >
+        <Icon name="refresh"/>
+        <span>
+          <strong>Restart</strong>
+          <small>Restart the Lenovo</small>
+        </span>
+      </button>
+
+      <button
+        className="system-power-action system-power-action--danger"
+        onClick={() => {
+          if (inPowerFlight) return
+          if (!window.confirm('Shut down the Lenovo?')) return
+          setInPowerFlight(true)
+          try {
+            const pin = window.prompt('Enter EV0L system PIN')
+            if (!pin) return
+
+fetch(`${EVOL_POWER_API_URL}/api/system/power`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'shutdown', pin }),
+          })
+          } finally {
+            setInPowerFlight(false)
+          }
+        }}
+      >
+        <Icon name="power"/>
+        <span>
+          <strong>Shut down</strong>
+          <small>Turn off the Lenovo</small>
+        </span>
+      </button>
+
+    </div>
+  </section>
+</div>}
+{helpOpen && <div className="dialog-backdrop" role="presentation" onMouseDown={() => setHelpOpen(false)}><section className="shortcut-dialog" role="dialog" aria-modal="true" aria-labelledby="shortcut-title" onMouseDown={(e) => e.stopPropagation()}><header><div><span className="eyebrow">Navigate faster</span><h2 id="shortcut-title">Keyboard shortcuts</h2></div><button className="icon-button" onClick={() => setHelpOpen(false)} aria-label="Close"><Icon name="close"/></button></header><div className="shortcut-list"><span><kbd>H</kbd>Home</span><span><kbd>S</kbd>Search</span><span><kbd>M</kbd>My List</span><span><kbd>?</kbd>Open this help</span><span><kbd>Esc</kbd>Close overlays</span></div></section></div>}
+  </div>
+}
+
+export function RootShell({ children }: { children: ReactNode }) {
+  const [profile, setProfile] = useState<Profile | null>(() => {
+    const id = localStorage.getItem(STORAGE.activeProfile)
+    return id ? loadProfiles().find((item) => item.id === id) || null : null
+  })
+  function select(next: Profile) { setActiveProfileId(next.id); setProfile(next) }
+  if (!profile) return <ProfilePicker onSelect={select}/>
+  return <AppShell profile={profile} onSwitchProfile={() => { localStorage.removeItem(STORAGE.activeProfile); setProfile(null) }}>{children}</AppShell>
+}
+
+
