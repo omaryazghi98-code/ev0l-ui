@@ -90,3 +90,55 @@ h1 { margin: 10px 0 0; font-size: 52px; }
   opacity: 0.48;
   font-size: 18px;
 }
+
+.native-player {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: stretch;
+  background: #000;
+  z-index: 100;
+}
+
+.native-player__video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+
+.native-player__hud {
+  position: fixed;
+  left: 36px;
+  right: 36px;
+  top: 28px;
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  pointer-events: none;
+  font-size: 22px;
+  text-shadow: 0 2px 12px rgba(0,0,0,.8);
+}
+
+.native-player__error {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  gap: 12px;
+  padding: 48px;
+  text-align: center;
+  background: rgba(0,0,0,.82);
+}
+
+.native-player__error strong { font-size: 36px; }
+.native-player__error span { font-size: 22px; opacity: .78; }
+.native-player__error button {
+  justify-self: center;
+  margin-top: 16px;
+  padding: 16px 28px;
+  border: 2px solid rgba(255,255,255,.4);
+  border-radius: 12px;
+  color: #fff;
+  background: rgba(255,255,255,.08);
+}
