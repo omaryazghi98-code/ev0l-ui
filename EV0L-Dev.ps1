@@ -54,8 +54,32 @@ function Get-EvolProcesses {
         Where-Object {
             $_.CommandLine -and
             ($_.CommandLine -like "*$Root*server.mjs*" -or
-             $_.CommandLine -like "*$Root*power-server.mjs*")
+             $_.CommandLine -like "*$Root*power-server.mjs*" -or
+             $_.CommandLine -like "*$Root*vite*bin*vite.js*" )
         }
+}
+
+function Test-EvolProcess {
+    param(
+        [ValidateSet('API','Power','UI')]
+        [string]$Name,
+        [string]$CommandLine
+    )
+
+    if ([string]::IsNullOrWhiteSpace($CommandLine)) { return $false }
+
+    switch ($Name) {
+        'API'   { return $CommandLine -like "*$Root*server.mjs*" -and $CommandLine -notlike "*$Root*power-server.mjs*" }
+        'Power' { return $CommandLine -like "*$Root*power-server.mjs*" }
+        'UI'    {
+            return (
+                $CommandLine -like "*$Root*vite*bin*vite.js*" -and
+                $CommandLine -like '*--host 0.0.0.0*'
+            )
+        }
+    }
+
+    return $false
 }
 
 function Start-EvolService {
@@ -120,15 +144,7 @@ function Stop-EvolService {
         return
     }
 
-    $expected = switch ($Name) {
-        'API'   { "*$Root*server.mjs*" }
-        'Power' { "*$Root*power-server.mjs*" }
-        'UI'    { "*${Root}*npm*run dev*" }
-    }
-
-    $isExpected = $proc.CommandLine -like $expected
-
-    if (-not $isExpected) {
+    if (-not (Test-EvolProcess -Name $Name -CommandLine $proc.CommandLine)) {
         Write-MenuLine "[$Name] Refusing to stop PID $owner because it is not an EV0L process:" Red
         Write-MenuLine "      $($proc.CommandLine)" Yellow
         return
