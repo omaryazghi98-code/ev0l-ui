@@ -6,6 +6,7 @@ import {
   SearchPage, SportsPage, SportsWatchPage, StreamingPage, StatusPage, TitlePage, WatchPage,
 } from './pages/Pages'
 import SettingsPage from './pages/SettingsPage'
+import SimklPage from './pages/SimklPage'
 import './styles/globals.css'
 
 export default function App() {
@@ -25,6 +26,8 @@ export default function App() {
     <Route path="/watch/:type/:id/:season/:episode" element={<WatchPage/>}/>
     <Route path="/status" element={<StatusPage/>}/>
     <Route path="/settings" element={<SettingsPage/>}/>
+    <Route path="/simkl/callback" element={<SimklPage/>}/>
+    <Route path="/simkl" element={<SimklPage/>}/>
     <Route path="*" element={<NotFoundPage/>}/>
   </Routes></RootShell></BrowserRouter>
 }
