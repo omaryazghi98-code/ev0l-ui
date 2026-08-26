@@ -6,12 +6,10 @@
   viewmodes="maximized">
   <name>EV0L TV</name>
   <content src="index.html" />
-  <icon src="public/icon.png" />
   <tizen:profile name="tv-samsung" />
   <tizen:application id="Ev0lTv.Tizen" package="Ev0lTv" required_version="6.0" />
   <tizen:setting name="http://tizen.org/setting/remote" value="enable" />
   <access origin="*" subdomains="true" />
   <tizen:privilege name="http://tizen.org/privilege/internet" />
   <tizen:privilege name="http://tizen.org/privilege/network.get" />
-  <feature name="http://tizen.org/feature/screen.size.normal.1080.1920" />
 </widget>
