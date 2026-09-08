@@ -19,3 +19,11 @@ sudo_as_admin_successful
 *.diff
 
 guest-invites.json
+
+# Local HTTPS certificates
+*.pem
+*.key
+
+# Local HTTPS certificates
+*.pem
+*.key
