@@ -23,7 +23,5 @@ guest-invites.json
 # Local HTTPS certificates
 *.pem
 *.key
-
-# Local HTTPS certificates
-*.pem
-*.key
+certs/*.pem
+certs/*.key
