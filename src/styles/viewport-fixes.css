@@ -1,0 +1,55 @@
+/* Keep the document itself inside the viewport while allowing media rails to scroll horizontally. */
+html,
+body,
+#root {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.app-shell,
+.app-content,
+.page,
+.page-stack,
+.home-stack,
+.rail-section,
+.section-title {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.media-rail,
+.continue-rail {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.media-rail > *,
+.continue-rail > * {
+  min-width: 0;
+}
+
+.page-stack > *,
+.page > *,
+.home-stack > *,
+.rail-section > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media (max-width: 700px) {
+  .media-rail,
+  .continue-rail {
+    scrollbar-width: none;
+  }
+
+  .media-rail::-webkit-scrollbar,
+  .continue-rail::-webkit-scrollbar {
+    display: none;
+  }
+}
