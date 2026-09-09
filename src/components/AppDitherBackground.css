@@ -1,0 +1,21 @@
+.app-dither-background {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.28;
+  overflow: hidden;
+}
+
+.app-dither-background::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, transparent 18%, rgba(0, 0, 0, 0.42) 100%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-dither-background {
+    opacity: 0.2;
+  }
+}
