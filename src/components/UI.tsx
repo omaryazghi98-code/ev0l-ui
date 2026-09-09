@@ -11,7 +11,7 @@ const icons: Record<string, ReactNode> = {
   bookmark: <path d="M6 3h12v18l-6-4-6 4z"/>,
   search: <><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></>,
   user: <><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></>,
-  sun: <><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></>,
+  sun: <><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l-1.4-1.4M17.7 6.3l1.4-1.4"/></>,
   moon: <path d="M21 15a9 9 0 1 1-12-12 7 7 0 0 0 12 12z"/>,
   lock: <><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></>,
   plus: <path d="M12 5v14M5 12h14"/>,
@@ -33,7 +33,7 @@ export function Icon({ name, size = 20 }: { name: string; size?: number }) {
 export function Brand({ compact = false }: { compact?: boolean }) {
   return <Link className={`brand ${compact ? 'brand--compact' : ''}`} to="/" aria-label="EV0L home">
     <span className={`brand-ascii ${compact ? 'brand-ascii--compact' : ''}`} aria-hidden="true">
-      <ASCIIText text="Ev0L" asciiFontSize={compact ? 4 : 5} textFontSize={compact ? 86 : 102} planeBaseHeight={6} enableWaves />
+      <ASCIIText text="Ev0L" asciiFontSize={compact ? 7 : 10} textFontSize={compact ? 128 : 180} planeBaseHeight={8} enableWaves />
     </span>
     {!compact && <small>STREAMING</small>}
   </Link>
@@ -52,18 +52,11 @@ export function MediaRow({ title, items, numbered = false, empty }: { title: str
   return <section className="rail-section"><div className="section-title"><h2>{title}</h2><span>{items.length} titles</span></div><div className="media-rail">{items.map((media, index) => <MediaCard key={`${media.type}-${media.id}`} media={media} index={numbered ? index : undefined}/>)}</div></section>
 }
 export function ContinueCard({ item }: { item: LibraryItem }) {
-  const progress = item.duration > 0 ? Math.min(100, Math.max(0, item.position / item.duration * 100)) : null
-  return <Link className="continue-card" to={itemPath(item)}><div className="continue-card__art">{item.poster ? <img src={item.poster} alt="" loading="lazy"/> : <div className="image-fallback">EV0L</div>}<span className="continue-card__play"><Icon name="play"/></span>{progress !== null && <span className="progress"><i style={{ width: `${progress}%` }}/></span>}</div><div><strong>{item.name}</strong><span>{item.type === 'series' && item.season ? `S${item.season} E${item.episode || 1}` : progress !== null ? `${Math.round(progress)}% watched` : 'Continue watching'}</span></div></Link>
+  return <Link className="continue-card" to={itemPath(item)}><div className="continue-card__art">{item.poster ? <img src={item.poster} alt="" loading="lazy"/> : <div className="image-fallback">EV0L</div>}</div><div className="continue-card__copy"><strong>{item.name}</strong><span>{item.type}{item.episode ? ` · S${item.season} E${item.episode}` : ''}</span></div></Link>
 }
-export function EpisodeCard({ episode, mediaId, state = 'unwatched' }: { episode: Episode; mediaId: string; state?: 'watched' | 'current' | 'unwatched' }) {
-  return <Link className={`episode-card episode-card--${state}`} to={`/watch/series/${mediaId}/${episode.season}/${episode.episode}`}><div className="episode-card__art">{episode.thumbnail ? <img src={episode.thumbnail} alt="" loading="lazy"/> : <div className="image-fallback">S{episode.season} E{episode.episode}</div>}<span className="episode-card__play"><Icon name={state === 'watched' ? 'check' : 'play'}/></span></div><div className="episode-card__copy"><span className="episode-number">{String(episode.episode).padStart(2, '0')}</span><div><strong>{episode.name || `Episode ${episode.episode}`}</strong><p>{episode.overview || 'Episode details are not available yet.'}</p></div>{state !== 'unwatched' && <span className="episode-state">{state}</span>}</div></Link>
+export function EpisodeCard({ episode, mediaId, state }: { episode: Episode; mediaId: string; state: 'current' | 'watched' | 'unwatched' }) {
+  return <Link className={`episode-card episode-card--${state}`} to={`/watch/series/${mediaId}/${episode.season}/${episode.episode}`}><div className="episode-card__thumb">{episode.thumbnail ? <img src={episode.thumbnail} alt="" loading="lazy"/> : <div className="image-fallback">{episode.episode}</div>}</div><div className="episode-card__copy"><span className="eyebrow">Episode {episode.episode}</span><strong>{episode.name}</strong>{episode.overview && <p>{episode.overview}</p>}</div></Link>
 }
-export function Skeleton({ variant = 'card', count = 1 }: { variant?: 'card' | 'hero' | 'line' | 'channel'; count?: number }) {
-  return <>{Array.from({ length: count }, (_, i) => <span key={i} className={`skeleton skeleton--${variant}`} aria-hidden="true" />)}</>
-}
-export function ErrorState({ title = 'Something went wrong', message, retry }: { title?: string; message?: string; retry?: () => void }) {
-  return <div className="state-card state-card--error"><span className="state-icon"><Icon name="info"/></span><div><h3>{title}</h3><p>{message || 'EV0L could not load this content. Check the server or your connection.'}</p></div>{retry && <button className="button button--subtle" onClick={retry}><Icon name="refresh"/>Try again</button>}</div>
-}
-export function EmptyState({ title, message, compact = false, action }: { title: string; message?: string; compact?: boolean; action?: ReactNode }) {
-  return <div className={`state-card state-card--empty${compact ? ' state-card--compact' : ''}`}><span className="state-icon"><Icon name="film"/></span><div><h3>{title}</h3>{message && <p>{message}</p>}</div>{action}</div>
-}
+export function EmptyState({ title = 'Nothing here yet', message, compact = false }: { title?: string; message?: string; compact?: boolean }) { return <section className={`empty-state${compact ? ' empty-state--compact' : ''}`}><span>EV0L</span><h3>{title}</h3>{message && <p>{message}</p>}</section> }
+export function ErrorState({ title = 'Something went wrong', message, retry }: { title?: string; message: string; retry?: () => void }) { return <section className="error-state"><span className="error-state__code">ERR</span><h3>{title}</h3><p>{message}</p>{retry && <button className="button button--subtle" onClick={retry}><Icon name="refresh"/>Try again</button>}</section> }
+export function Skeleton({ variant = 'card', count = 1 }: { variant?: 'card' | 'hero'; count?: number }) { return <>{Array.from({ length: count }, (_, i) => <div key={i} className={`skeleton skeleton--${variant}`} />)}</> }
