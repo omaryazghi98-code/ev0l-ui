@@ -1,8 +1,10 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { EVOL_POWER_API_URL } from '../config'
-import { applyTheme, getTheme, loadProfiles, setActiveProfileId, STORAGE, type Profile, type Theme } from '../lib/ev0l'
+import { applyTheme, getTheme, loadProfiles, setActiveProfileId, STORAGE, type Profile, type Theme, verifyProfilePin } from '../lib/ev0l'
 import { Brand, Icon } from './UI'
+import ProfileUnlockGate from './ProfileUnlockGate'
+import ProfileCard from './ProfileCard'
 
 const NAV = [
   { to: '/', label: 'Home', icon: 'home' },
@@ -17,6 +19,8 @@ const NAV = [
 
 export function ProfilePicker({ onSelect }: { onSelect: (profile: Profile) => void }) {
   const [profiles, setProfiles] = useState(loadProfiles)
+  const [lockedProfile, setLockedProfile] = useState<Profile | null>(null)
+
   function addGuest() {
     const count = profiles.filter((profile) => profile.id.startsWith('guest')).length + 1
     const profile = { id: `guest-${Date.now()}`, name: `Guest ${count}`, avatar: 'G' }
@@ -24,20 +28,60 @@ export function ProfilePicker({ onSelect }: { onSelect: (profile: Profile) => vo
     localStorage.setItem(STORAGE.profiles, JSON.stringify(next))
     setProfiles(next)
   }
-  return <main className="profile-screen">
-    <div className="profile-ambient profile-ambient--one"/><div className="profile-ambient profile-ambient--two"/>
-    <header className="profile-top"><Brand/><span>Personal streaming, evolved.</span></header>
-    <section className="profile-panel" aria-labelledby="profile-title">
-      <span className="eyebrow">Choose your space</span><h1 id="profile-title">Who's watching?</h1><p>Your history, queue, and recommendations stay personal.</p>
-      <div className="profile-grid">
-        {profiles.map((profile, index) => <button className="profile-card" key={profile.id} onClick={() => onSelect(profile)}>
-          <span className={`profile-avatar profile-avatar--${index % 4}`}>{profile.avatar || profile.name[0]}</span><strong>{profile.name}</strong><small>{profile.id === 'omar' ? 'Owner profile' : 'Private session'}</small>
-        </button>)}
-        <button className="profile-card profile-card--add" onClick={addGuest}><span className="profile-avatar"><Icon name="plus" size={32}/></span><strong>Add guest</strong><small>Create a new local profile</small></button>
-      </div>
-    </section>
-    <footer className="profile-footer"><span>EV0L</span><span>YOUR SCREEN. YOUR STORY.</span></footer>
-  </main>
+
+  function connect(profile: Profile) {
+    if (profile.pinHash) {
+      setLockedProfile(profile)
+      return
+    }
+    onSelect(profile)
+  }
+
+  return (
+    <main className="profile-screen">
+      <div className="profile-ambient profile-ambient--one" />
+      <div className="profile-ambient profile-ambient--two" />
+      <header className="profile-top"><Brand /><span>Personal streaming, evolved.</span></header>
+
+      <section className="profile-panel" aria-labelledby="profile-title">
+        <span className="eyebrow">Choose your space</span>
+        <h1 id="profile-title">Who's watching?</h1>
+        <p>Your history, queue, and recommendations stay personal.</p>
+
+        <div className="profile-grid profile-grid--cards">
+          {profiles.map((profile, index) => (
+            <ProfileCard
+              key={profile.id}
+              profile={profile}
+              index={index}
+              protected={Boolean(profile.pinHash)}
+              onConnect={() => connect(profile)}
+            />
+          ))}
+
+          <button className="profile-card profile-card--add" onClick={addGuest} type="button">
+            <span className="profile-avatar"><Icon name="plus" size={32} /></span>
+            <strong>Add guest</strong>
+            <small>Create a new local profile</small>
+          </button>
+        </div>
+      </section>
+
+      <footer className="profile-footer"><span>EV0L</span><span>YOUR SCREEN. YOUR STORY.</span></footer>
+
+      {lockedProfile && (
+        <ProfileUnlockGate
+          profile={lockedProfile}
+          onCancel={() => setLockedProfile(null)}
+          onUnlock={async (pin) => {
+            const accepted = await verifyProfilePin(lockedProfile, pin)
+            if (accepted) onSelect(lockedProfile)
+            return accepted
+          }}
+        />
+      )}
+    </main>
+  )
 }
 
 export function AppShell({ profile, onSwitchProfile, children }: { profile: Profile; onSwitchProfile: () => void; children: ReactNode }) {
@@ -81,98 +125,11 @@ export function AppShell({ profile, onSwitchProfile, children }: { profile: Prof
     <nav className="mobile-nav" aria-label="Mobile navigation">{NAV.map((item) => <NavLink key={item.to} to={item.to} end={item.to === '/'}><Icon name={item.icon}/><span>{item.label.replace('Live TV', 'Live')}</span></NavLink>)}</nav>
     {systemPowerOpen && <div className="dialog-backdrop" role="presentation" onMouseDown={() => setSystemPowerOpen(false)}>
   <section className="shortcut-dialog system-power-dialog" role="dialog" aria-modal="true" onMouseDown={(e) => e.stopPropagation()}>
-    <header>
-      <div>
-        <span className="eyebrow">Lenovo system</span>
-        <h2>Power</h2>
-      </div>
-
-      <button className="icon-button" onClick={() => setSystemPowerOpen(false)} aria-label="Close">
-        <Icon name="close"/>
-      </button>
-    </header>
-
+    <header><div><span className="eyebrow">Lenovo system</span><h2>Power</h2></div><button className="icon-button" onClick={() => setSystemPowerOpen(false)} aria-label="Close"><Icon name="close"/></button></header>
     <div className="system-power-actions">
-
-<button
-        className="system-power-action"
-        onClick={() => {
-          if (inPowerFlight) return
-          setInPowerFlight(true)
-          try {
-            const pin = window.prompt('Enter EV0L system PIN')
-            if (!pin) return
-fetch(`${EVOL_POWER_API_URL}/api/system/power`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'sleep', pin }),
-          })
-          } finally {
-            setInPowerFlight(false)
-          }
-        }}
-      >
-        <Icon name="moon"/>
-        <span>
-          <strong>Sleep</strong>
-          <small>Put the Lenovo to sleep</small>
-        </span>
-      </button>
-
-<button
-        className="system-power-action"
-        onClick={() => {
-          if (inPowerFlight) return
-          if (!window.confirm('Restart the Lenovo?')) return
-          setInPowerFlight(true)
-          try {
-            const pin = window.prompt('Enter EV0L system PIN')
-            if (!pin) return
-
-fetch(`${EVOL_POWER_API_URL}/api/system/power`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'restart', pin }),
-          })
-          } finally {
-            setInPowerFlight(false)
-          }
-        }}
-      >
-        <Icon name="refresh"/>
-        <span>
-          <strong>Restart</strong>
-          <small>Restart the Lenovo</small>
-        </span>
-      </button>
-
-      <button
-        className="system-power-action system-power-action--danger"
-        onClick={() => {
-          if (inPowerFlight) return
-          if (!window.confirm('Shut down the Lenovo?')) return
-          setInPowerFlight(true)
-          try {
-            const pin = window.prompt('Enter EV0L system PIN')
-            if (!pin) return
-
-fetch(`${EVOL_POWER_API_URL}/api/system/power`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'shutdown', pin }),
-          })
-          } finally {
-            setInPowerFlight(false)
-          }
-        }}
-      >
-        <Icon name="power"/>
-        <span>
-          <strong>Shut down</strong>
-          <small>Turn off the Lenovo</small>
-        </span>
-      </button>
-
+      <button className="system-power-action" onClick={() => { if (inPowerFlight) return; setInPowerFlight(true); try { const pin = window.prompt('Enter EV0L system PIN'); if (!pin) return; fetch(`${EVOL_POWER_API_URL}/api/system/power`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'sleep', pin }) }) } finally { setInPowerFlight(false) } }}><Icon name="moon"/><span><strong>Sleep</strong><small>Put the Lenovo to sleep</small></span></button>
+      <button className="system-power-action" onClick={() => { if (inPowerFlight) return; if (!window.confirm('Restart the Lenovo?')) return; setInPowerFlight(true); try { const pin = window.prompt('Enter EV0L system PIN'); if (!pin) return; fetch(`${EVOL_POWER_API_URL}/api/system/power`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'restart', pin }) }) } finally { setInPowerFlight(false) } }}><Icon name="refresh"/><span><strong>Restart</strong><small>Restart the Lenovo</small></span></button>
+      <button className="system-power-action system-power-action--danger" onClick={() => { if (inPowerFlight) return; if (!window.confirm('Shut down the Lenovo?')) return; setInPowerFlight(true); try { const pin = window.prompt('Enter EV0L system PIN'); if (!pin) return; fetch(`${EVOL_POWER_API_URL}/api/system/power`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'shutdown', pin }) }) } finally { setInPowerFlight(false) } }}><Icon name="power"/><span><strong>Shut down</strong><small>Turn off the Lenovo</small></span></button>
     </div>
   </section>
 </div>}
@@ -189,5 +146,3 @@ export function RootShell({ children }: { children: ReactNode }) {
   if (!profile) return <ProfilePicker onSelect={select}/>
   return <AppShell profile={profile} onSwitchProfile={() => { localStorage.removeItem(STORAGE.activeProfile); setProfile(null) }}>{children}</AppShell>
 }
-
-
