@@ -7,6 +7,7 @@ import { loadProfiles, setActiveProfileId, STORAGE, verifyProfilePin, type Profi
 export default function ProfileGuardAgent() {
   const [lockedProfile, setLockedProfile] = useState<Profile | null>(null)
   const [guestLockOpen, setGuestLockOpen] = useState(false)
+  const [guestLockInline, setGuestLockInline] = useState(false)
   const targetRef = useRef<HTMLButtonElement | null>(null)
   const allowNextClickRef = useRef(false)
   const location = useLocation()
@@ -22,6 +23,7 @@ export default function ProfileGuardAgent() {
         allowNextClickRef.current = false
         return
       }
+
       const target = event.target as HTMLElement | null
       if (!target) return
 
@@ -40,10 +42,13 @@ export default function ProfileGuardAgent() {
 
       if (!isGuest) return
 
-      const settingsLink = target.closest<HTMLAnchorElement>('a[href="/settings"]')
-      if (settingsLink || location.pathname === '/settings') {
+      const sensitive =
+        target.closest<HTMLButtonElement>('[data-admin-only]') ||
+        target.closest<HTMLAnchorElement>('[data-admin-only]')
+      if (sensitive) {
         event.preventDefault()
         event.stopPropagation()
+        setGuestLockInline(false)
         setGuestLockOpen(true)
         return
       }
@@ -54,21 +59,27 @@ export default function ProfileGuardAgent() {
       if (systemPowerButton && (target === systemPowerButton || systemPowerButton.contains(target))) {
         event.preventDefault()
         event.stopPropagation()
+        setGuestLockInline(false)
         setGuestLockOpen(true)
       }
     }
+
     document.addEventListener('click', onClickCapture, true)
     return () => document.removeEventListener('click', onClickCapture, true)
-  }, [isGuest, location.pathname])
+  }, [isGuest])
 
   useEffect(() => {
-    if (isGuest && location.pathname === '/settings') {
-      setGuestLockOpen(true)
-    }
     if (!isGuest) {
       setGuestLockOpen(false)
+      setGuestLockInline(false)
     }
-  }, [isGuest, location.pathname])
+  }, [isGuest])
+
+  useEffect(() => {
+    if (!guestLockOpen) return
+    if (location.pathname !== '/settings') return
+    setGuestLockInline(true)
+  }, [guestLockOpen, location.pathname])
 
   if (lockedProfile) {
     return (
@@ -93,13 +104,27 @@ export default function ProfileGuardAgent() {
     )
   }
 
-  if (guestLockOpen && isGuest) {
+  if (guestLockOpen && isGuest && !guestLockInline) {
     return (
       <GuestAdminLock
         onBack={() => {
           setGuestLockOpen(false)
-          if (location.pathname === '/settings') navigate('/')
+          if (location.pathname !== '/settings') navigate('/')
         }}
+        onUnlock={() => {
+          setGuestLockOpen(false)
+          setGuestLockInline(false)
+        }}
+      />
+    )
+  }
+
+  if (guestLockOpen && isGuest && guestLockInline) {
+    return (
+      <GuestAdminLock
+        inline
+        onBack={() => setGuestLockOpen(false)}
+        onUnlock={() => setGuestLockOpen(false)}
       />
     )
   }
