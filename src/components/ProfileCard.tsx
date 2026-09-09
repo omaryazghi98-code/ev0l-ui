@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import type { Profile } from '../lib/ev0l'
 import './ProfileCard.css'
 
@@ -82,7 +82,7 @@ export default function ProfileCard({ profile, index = 0, protected: isProtected
     }, 760)
   }
 
-  function activateFromCard(event: React.MouseEvent<HTMLElement>) {
+  function activateFromCard(event: MouseEvent<HTMLElement>) {
     if (!isProtected || flipped) return
     if ((event.target as HTMLElement).closest('button')) return
     connect()
