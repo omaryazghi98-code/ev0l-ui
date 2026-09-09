@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { itemPath, mediaPath, type Episode, type LibraryItem, type Meta } from '../lib/ev0l'
-import ASCIIText from './ASCIIText'
 
 const icons: Record<string, ReactNode> = {
   home: <><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10.5V20h14v-9.5M9 20v-6h6v6"/></>,
@@ -32,9 +31,7 @@ export function Icon({ name, size = 20 }: { name: string; size?: number }) {
 }
 export function Brand({ compact = false }: { compact?: boolean }) {
   return <Link className={`brand ${compact ? 'brand--compact' : ''}`} to="/" aria-label="EV0L home">
-    <span className={`brand-ascii ${compact ? 'brand-ascii--compact' : ''}`} aria-hidden="true">
-      <ASCIIText text="Ev0L" asciiFontSize={compact ? 7 : 10} textFontSize={compact ? 128 : 180} planeBaseHeight={8} enableWaves />
-    </span>
+    <span className={`brand-wordmark ${compact ? 'brand-wordmark--compact' : ''}`} aria-hidden="true">Ev0L</span>
     {!compact && <small>STREAMING</small>}
   </Link>
 }
