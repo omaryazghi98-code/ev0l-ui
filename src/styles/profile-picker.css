@@ -1,0 +1,33 @@
+.profile-screen__ether{
+  position:absolute;
+  inset:0;
+  z-index:0;
+  pointer-events:none;
+  opacity:.32;
+  mix-blend-mode:screen;
+}
+
+.profile-screen__ether .liquid-ether-container{
+  position:absolute;
+  inset:0;
+}
+
+.profile-screen__content{
+  position:relative;
+  z-index:2;
+}
+
+.profile-screen__ether::after{
+  content:'';
+  position:absolute;
+  inset:0;
+  background:radial-gradient(circle at 50% 42%,transparent 0,rgba(5,6,8,.08) 42%,rgba(5,6,8,.58) 100%);
+}
+
+@media (max-width:700px){
+  .profile-screen__ether{opacity:.24}
+}
+
+@media (prefers-reduced-motion:reduce){
+  .profile-screen__ether{display:none}
+}
