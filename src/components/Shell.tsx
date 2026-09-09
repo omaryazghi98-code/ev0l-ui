@@ -5,6 +5,8 @@ import { applyTheme, getTheme, loadProfiles, setActiveProfileId, STORAGE, type P
 import { Brand, Icon } from './UI'
 import ProfileUnlockGate from './ProfileUnlockGate'
 import ProfileCard from './ProfileCard'
+import LiquidEther from './LiquidEther'
+import '../styles/profile-picker.css'
 
 const NAV = [
   { to: '/', label: 'Home', icon: 'home' },
@@ -39,35 +41,54 @@ export function ProfilePicker({ onSelect }: { onSelect: (profile: Profile) => vo
 
   return (
     <main className="profile-screen">
-      <div className="profile-ambient profile-ambient--one" />
-      <div className="profile-ambient profile-ambient--two" />
-      <header className="profile-top"><Brand /><span>Personal streaming, evolved.</span></header>
+      <div className="profile-screen__ether" aria-hidden="true">
+        <LiquidEther
+          colors={['#00F0FF', '#7C3CFF', '#19FF8C']}
+          mouseForce={18}
+          cursorSize={100}
+          isViscous={false}
+          resolution={0.45}
+          isBounce={false}
+          autoDemo={true}
+          autoSpeed={0.35}
+          autoIntensity={1.8}
+          takeoverDuration={0.25}
+          autoResumeDelay={3000}
+          autoRampDuration={0.6}
+        />
+      </div>
 
-      <section className="profile-panel" aria-labelledby="profile-title">
-        <span className="eyebrow">Choose your space</span>
-        <h1 id="profile-title">Who's watching?</h1>
-        <p>Your history, queue, and recommendations stay personal.</p>
+      <div className="profile-screen__content">
+        <div className="profile-ambient profile-ambient--one" />
+        <div className="profile-ambient profile-ambient--two" />
+        <header className="profile-top"><Brand /><span>Personal streaming, evolved.</span></header>
 
-        <div className="profile-grid profile-grid--cards">
-          {profiles.map((profile, index) => (
-            <ProfileCard
-              key={profile.id}
-              profile={profile}
-              index={index}
-              protected={Boolean(profile.pinHash)}
-              onConnect={() => connect(profile)}
-            />
-          ))}
+        <section className="profile-panel" aria-labelledby="profile-title">
+          <span className="eyebrow">Choose your space</span>
+          <h1 id="profile-title">Who's watching?</h1>
+          <p>Your history, queue, and recommendations stay personal.</p>
 
-          <button className="profile-card profile-card--add" onClick={addGuest} type="button">
-            <span className="profile-avatar"><Icon name="plus" size={32} /></span>
-            <strong>Add guest</strong>
-            <small>Create a new local profile</small>
-          </button>
-        </div>
-      </section>
+          <div className="profile-grid profile-grid--cards">
+            {profiles.map((profile, index) => (
+              <ProfileCard
+                key={profile.id}
+                profile={profile}
+                index={index}
+                protected={Boolean(profile.pinHash)}
+                onConnect={() => connect(profile)}
+              />
+            ))}
 
-      <footer className="profile-footer"><span>EV0L</span><span>YOUR SCREEN. YOUR STORY.</span></footer>
+            <button className="profile-card profile-card--add" onClick={addGuest} type="button">
+              <span className="profile-avatar"><Icon name="plus" size={32} /></span>
+              <strong>Add guest</strong>
+              <small>Create a new local profile</small>
+            </button>
+          </div>
+        </section>
+
+        <footer className="profile-footer"><span>EV0L</span><span>YOUR SCREEN. YOUR STORY.</span></footer>
+      </div>
 
       {lockedProfile && (
         <ProfileUnlockGate
@@ -128,7 +149,7 @@ export function AppShell({ profile, onSwitchProfile, children }: { profile: Prof
     <header><div><span className="eyebrow">Lenovo system</span><h2>Power</h2></div><button className="icon-button" onClick={() => setSystemPowerOpen(false)} aria-label="Close"><Icon name="close"/></button></header>
     <div className="system-power-actions">
       <button className="system-power-action" onClick={() => { if (inPowerFlight) return; setInPowerFlight(true); try { const pin = window.prompt('Enter EV0L system PIN'); if (!pin) return; fetch(`${EVOL_POWER_API_URL}/api/system/power`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'sleep', pin }) }) } finally { setInPowerFlight(false) } }}><Icon name="moon"/><span><strong>Sleep</strong><small>Put the Lenovo to sleep</small></span></button>
-      <button className="system-power-action" onClick={() => { if (inPowerFlight) return; if (!window.confirm('Restart the Lenovo?')) return; setInPowerFlight(true); try { const pin = window.prompt('Enter EV0L system PIN'); if (!pin) return; fetch(`${EVOL_POWER_API_URL}/api/system/power`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'restart', pin }) }) } finally { setInPowerFlight(false) } }}><Icon name="refresh"/><span><strong>Restart</strong><small>Restart the Lenovo</small></span></button>
+      <button className="system-power-action" onClick={() => { if (inPowerFlight) return; if (!window.confirm('Restart the Lenovo?')) return; setInPowerFlight(true); try { const pin = window.prompt('Enter EV0L system PIN'); if (!pin) return; fetch(`${EVOL_POWER_API_URL}/api/system/power`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'restart', pin }) } ) } finally { setInPowerFlight(false) } }}><Icon name="refresh"/><span><strong>Restart</strong><small>Restart the Lenovo</small></span></button>
       <button className="system-power-action system-power-action--danger" onClick={() => { if (inPowerFlight) return; if (!window.confirm('Shut down the Lenovo?')) return; setInPowerFlight(true); try { const pin = window.prompt('Enter EV0L system PIN'); if (!pin) return; fetch(`${EVOL_POWER_API_URL}/api/system/power`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'shutdown', pin }) }) } finally { setInPowerFlight(false) } }}><Icon name="power"/><span><strong>Shut down</strong><small>Turn off the Lenovo</small></span></button>
     </div>
   </section>
