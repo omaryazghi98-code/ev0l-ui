@@ -53,13 +53,20 @@ body,
     display: none;
   }
 
-  /* The desktop header contains a full-width nav plus right-side actions.
-     On narrow touch screens the nav itself must be the horizontal scroller;
-     the page must remain locked to the viewport. */
+  /* iPhone standalone/PWA safe-area handling. The fixed header must live
+     below the physical top sensor/notch while content reserves the same
+     extra height. */
+  :root {
+    --header-h: calc(72px + env(safe-area-inset-top));
+  }
+
   .site-header {
     min-width: 0;
+    height: var(--header-h);
     gap: 10px;
-    padding-inline: max(12px, env(safe-area-inset-left)) max(12px, env(safe-area-inset-right));
+    padding-top: env(safe-area-inset-top);
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
   }
 
   .site-header > .brand {
