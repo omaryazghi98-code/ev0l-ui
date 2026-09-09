@@ -1,3 +1,8 @@
+.app-shell {
+  position: relative;
+  isolation: isolate;
+}
+
 .app-dither-background {
   position: fixed;
   inset: 0;
