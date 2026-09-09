@@ -31,6 +31,7 @@ export default defineConfig({
       '/library': {
         target: 'http://127.0.0.1:8090',
         changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/library/, '/api/library'),
       },
     },
     allowedHosts: ['6icko-ministation', 'ev0l-lan', 'ev0l.lan'],
