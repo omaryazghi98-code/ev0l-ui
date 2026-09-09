@@ -1,17 +1,15 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { RootShell } from './components/Shell'
 import PlayerPicker from './components/PlayerPicker'
+import ProfileGuardAgent from './components/ProfileGuardAgent'
 import SimklSyncAgent from './components/SimklSyncAgent'
-import {
-  HomePage, IPTVPage, IPTVWatchPage, ListingPage, MyListPage, NotFoundPage,
-  SearchPage, SportsPage, SportsWatchPage, StreamingPage, StatusPage, TitlePage, WatchPage,
-} from './pages/Pages'
+import { HomePage, IPTVPage, IPTVWatchPage, ListingPage, MyListPage, NotFoundPage, SearchPage, SportsPage, SportsWatchPage, StreamingPage, StatusPage, TitlePage, WatchPage } from './pages/Pages'
 import SettingsPage from './pages/SettingsPage'
 import SimklPage from './pages/SimklPage'
 import './styles/globals.css'
 
 export default function App() {
-  return <BrowserRouter><RootShell><PlayerPicker/><SimklSyncAgent/><Routes>
+  return <BrowserRouter><RootShell><ProfileGuardAgent/><PlayerPicker/><SimklSyncAgent/><Routes>
     <Route path="/" element={<HomePage/>}/>
     <Route path="/movies" element={<ListingPage type="movie"/>}/>
     <Route path="/series" element={<ListingPage type="series"/>}/>
