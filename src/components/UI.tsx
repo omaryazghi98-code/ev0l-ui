@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { itemPath, mediaPath, type Episode, type LibraryItem, type Meta } from '../lib/ev0l'
+import ASCIIText from './ASCIIText'
 
 const icons: Record<string, ReactNode> = {
   home: <><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10.5V20h14v-9.5M9 20v-6h6v6"/></>,
@@ -30,7 +31,12 @@ export function Icon({ name, size = 20 }: { name: string; size?: number }) {
   return <svg className="icon" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{icons[name]}</svg>
 }
 export function Brand({ compact = false }: { compact?: boolean }) {
-  return <Link className="brand" to="/" aria-label="EV0L home"><span>EV</span><i>0</i><span>L</span>{!compact && <small>STREAMING</small>}</Link>
+  return <Link className={`brand ${compact ? 'brand--compact' : ''}`} to="/" aria-label="EV0L home">
+    <span className={`brand-ascii ${compact ? 'brand-ascii--compact' : ''}`} aria-hidden="true">
+      <ASCIIText text="Ev0L" asciiFontSize={compact ? 4 : 5} textFontSize={compact ? 86 : 102} planeBaseHeight={6} enableWaves />
+    </span>
+    {!compact && <small>STREAMING</small>}
+  </Link>
 }
 export function PageHeading({ eyebrow, title, detail, action }: { eyebrow?: string; title: string; detail?: string; action?: ReactNode }) {
   return <header className="page-heading"><div>{eyebrow && <span className="eyebrow">{eyebrow}</span>}<h1>{title}</h1>{detail && <p>{detail}</p>}</div>{action}</header>
