@@ -1,18 +1,15 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Icon } from './UI'
 import type { Profile } from '../lib/ev0l'
+import { verifyProfilePin } from '../lib/ev0l'
 import '../styles/profile-lock.css'
 
-type Props = {
-  profile: Profile
-  onCancel: () => void
-  onUnlock: (password: string) => Promise<boolean> | boolean
-}
+type Props = { profile: Profile; onCancel: () => void; onUnlock: (pin: string) => Promise<boolean> | boolean }
 
 export default function ProfileUnlockGate({ profile, onCancel, onUnlock }: Props) {
-  const [password, setPassword] = useState('')
+  const [pin, setPin] = useState('')
   const [offset, setOffset] = useState({ x: 0, y: 0 })
-  const [message, setMessage] = useState('Enter the profile password to continue.')
+  const [message, setMessage] = useState('Enter your 4-digit PIN to continue.')
   const [shake, setShake] = useState(false)
   const [busy, setBusy] = useState(false)
   const [touchMode, setTouchMode] = useState(false)
@@ -23,50 +20,43 @@ export default function ProfileUnlockGate({ profile, onCancel, onUnlock }: Props
   }, [])
 
   function runAway() {
-    if (password.trim()) return
+    if (pin.trim()) return
     if (touchMode) {
       setShake(false)
       requestAnimationFrame(() => setShake(true))
-      setMessage('Locked profile — enter the password first.')
+      setMessage('Locked profile — enter the PIN first.')
       return
     }
-
     const x = Math.round((Math.random() * 2 - 1) * 84)
     const y = Math.round((Math.random() * 2 - 1) * 28)
     setOffset({ x, y })
-    setMessage('Almost there — enter the password first.')
+    setMessage('Almost there — enter the PIN first.')
   }
 
   async function submit(event?: FormEvent) {
     event?.preventDefault()
     if (busy) return
-
-    if (!password.trim()) {
-      runAway()
+    if (!pin.trim()) { runAway(); return }
+    if (!/^\d{4,8}$/.test(pin.trim())) {
+      setShake(false); requestAnimationFrame(() => setShake(true))
+      setMessage('PIN must contain 4 to 8 digits.')
       return
     }
-
     try {
       setBusy(true)
-      setMessage('Checking profile…')
-      const accepted = await onUnlock(password)
-      if (accepted) {
-        setMessage('Unlocked.')
-        onCancel()
-        return
-      }
+      setMessage('Checking PIN…')
+      const accepted = await onUnlock(pin)
+      if (accepted) { setMessage('Unlocked.'); onCancel(); return }
       setOffset({ x: 0, y: 0 })
       setShake(false)
       requestAnimationFrame(() => setShake(true))
-      setMessage('That password does not match this profile.')
+      setMessage('That PIN does not match this profile.')
     } catch {
       setOffset({ x: 0, y: 0 })
       setShake(false)
       requestAnimationFrame(() => setShake(true))
       setMessage('Unable to verify the profile right now.')
-    } finally {
-      setBusy(false)
-    }
+    } finally { setBusy(false) }
   }
 
   return (
@@ -74,55 +64,35 @@ export default function ProfileUnlockGate({ profile, onCancel, onUnlock }: Props
       <section className={`profile-lock__card${shake ? ' profile-lock__card--shake' : ''}`} role="dialog" aria-modal="true" aria-labelledby="profile-lock-title" onMouseDown={(event) => event.stopPropagation()}>
         <div className="profile-lock__ambient profile-lock__ambient--one" />
         <div className="profile-lock__ambient profile-lock__ambient--two" />
-
         <header className="profile-lock__top">
           <div className="profile-lock__identity">
             <span className="profile-lock__avatar">{profile.avatar || profile.name[0]}</span>
-            <div>
-              <span className="eyebrow">Protected profile</span>
-              <strong>{profile.name}</strong>
-            </div>
+            <div><span className="eyebrow">Protected profile</span><strong>{profile.name}</strong></div>
           </div>
-          <button className="icon-button" type="button" onClick={onCancel} aria-label="Cancel">
-            <Icon name="close" />
-          </button>
+          <button className="icon-button" type="button" onClick={onCancel} aria-label="Cancel"><Icon name="close" /></button>
         </header>
-
         <div className="profile-lock__copy">
-          <span className="profile-lock__lock"><Icon name="lock" size={20} /></span>
+          <span className="profile-lock__lock" aria-hidden="true">🔒</span>
           <h2 id="profile-lock-title">Private space</h2>
-          <p>This profile is protected. Enter its password to continue.</p>
+          <p>This profile is protected. Enter its PIN to continue.</p>
         </div>
-
         <form onSubmit={submit} noValidate>
-          <label className="profile-lock__label" htmlFor="profile-password">Password</label>
+          <label className="profile-lock__label" htmlFor="profile-pin">Profile PIN</label>
           <div className="profile-lock__input">
-            <Icon name="lock" size={17} />
-            <input id="profile-password" autoFocus type="password" autoComplete="current-password" value={password} onChange={(event) => { setPassword(event.target.value); setMessage('Enter the profile password to continue.') }} placeholder="Enter password" />
+            <Icon name="info" size={17} />
+            <input id="profile-pin" autoFocus inputMode="numeric" pattern="[0-9]*" autoComplete="one-time-code" type="password" maxLength={8} value={pin} onChange={(event) => { setPin(event.target.value.replace(/\D/g, '')); setMessage('Enter your 4-digit PIN to continue.') }} placeholder="Enter PIN" />
           </div>
-
           <div className="profile-lock__button-stage">
-            <button
-              className="profile-lock__button"
-              type="submit"
-              disabled={busy}
-              style={touchMode ? undefined : { transform: `translate(${offset.x}px, ${offset.y}px)` }}
-              onMouseEnter={runAway}
-              onFocus={runAway}
-              onTouchStart={runAway}
-            >
-              {busy ? 'Checking…' : 'Unlock'}
-              <Icon name="arrow" size={17} />
+            <button className="profile-lock__button" type="submit" disabled={busy} style={touchMode ? undefined : { transform: `translate(${offset.x}px, ${offset.y}px)` }} onMouseEnter={runAway} onFocus={runAway} onTouchStart={runAway}>
+              {busy ? 'Checking…' : 'Unlock'} <Icon name="arrow" size={17} />
             </button>
           </div>
-
-          <p className={`profile-lock__message${message ? ' profile-lock__message--visible' : ''}`} aria-live="polite">
-            <span>•</span>{message}
-          </p>
+          <p className={`profile-lock__message${message ? ' profile-lock__message--visible' : ''}`} aria-live="polite"><span>•</span>{message}</p>
         </form>
-
         <button type="button" className="profile-lock__cancel" onClick={onCancel}>Back to profiles</button>
       </section>
     </div>
   )
 }
+
+export async function verifyUnlockPin(profile: Profile, pin: string) { return verifyProfilePin(profile, pin) }
