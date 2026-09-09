@@ -52,4 +52,77 @@ body,
   .continue-rail::-webkit-scrollbar {
     display: none;
   }
+
+  /* The desktop header contains a full-width nav plus right-side actions.
+     On narrow touch screens the nav itself must be the horizontal scroller;
+     the page must remain locked to the viewport. */
+  .site-header {
+    min-width: 0;
+    gap: 10px;
+    padding-inline: max(12px, env(safe-area-inset-left)) max(12px, env(safe-area-inset-right));
+  }
+
+  .site-header > .brand {
+    flex: 0 0 auto;
+  }
+
+  .site-gooey-nav {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: none;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+  }
+
+  .site-gooey-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .site-gooey-nav nav {
+    width: max-content;
+    min-width: max-content;
+  }
+
+  .site-gooey-nav nav ul {
+    width: max-content;
+    min-width: max-content;
+  }
+
+  .site-gooey-nav nav ul li a {
+    padding-inline: 0.72em;
+  }
+
+  .header-actions {
+    flex: 0 0 auto;
+    margin-left: 0;
+  }
+
+  /* The bottom mobile nav is also an independent touch scroller so all
+     destinations (including Settings) remain reachable without restoring
+     horizontal scrolling to the document. */
+  .mobile-nav {
+    min-width: 0;
+    max-width: 100%;
+    justify-content: flex-start;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    padding-left: max(10px, env(safe-area-inset-left));
+    padding-right: max(10px, env(safe-area-inset-right));
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+  }
+
+  .mobile-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .mobile-nav > a {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
 }
