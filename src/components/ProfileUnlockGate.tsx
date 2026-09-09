@@ -1,7 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Icon } from './UI'
 import type { Profile } from '../lib/ev0l'
-import { verifyProfilePin } from '../lib/ev0l'
 import '../styles/profile-lock.css'
 
 type Props = { profile: Profile; onCancel: () => void; onUnlock: (pin: string) => Promise<boolean> | boolean }
@@ -94,5 +93,3 @@ export default function ProfileUnlockGate({ profile, onCancel, onUnlock }: Props
     </div>
   )
 }
-
-export async function verifyUnlockPin(profile: Profile, pin: string) { return verifyProfilePin(profile, pin) }
