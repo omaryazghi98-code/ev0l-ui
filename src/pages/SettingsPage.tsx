@@ -14,10 +14,9 @@ import {
 import type { NormalizedMetaPreview } from '../lib/normalizeMeta'
 import { Icon } from '../components/UI'
 import ProfilePhotoSettings from '../components/ProfilePhotoSettings'
-import EvolQrConnect from '../components/EvolQrConnect'
 import { loadProfiles, STORAGE, type Profile } from '../lib/ev0l'
 
-type SettingsTab = 'services' | 'providers' | 'ghost-sentry' | 'library' | 'appearance' | 'addons' | 'connect'
+type SettingsTab = 'services' | 'providers' | 'ghost-sentry' | 'library' | 'appearance' | 'addons'
 
 function TabButton({ label, selected, onClick }: { label: string; selected: boolean; onClick: () => void }) {
   return (
@@ -269,23 +268,14 @@ export default function SettingsPage() {
     )
   }
 
-  function renderConnectTab() {
-    return (
-      <section>
-        <h2>Connect devices</h2>
-        <EvolQrConnect />
-      </section>
-    )
-  }
-
-  const tabs: Array<[SettingsTab, string]> = [['services', 'Services'], ['providers', 'Providers'], ['ghost-sentry', 'Ghost Sentry'], ['library', 'Library'], ['appearance', 'Appearance'], ['addons', 'Add-ons'], ['connect', 'Connect']]
+  const tabs: Array<[SettingsTab, string]> = [['services', 'Services'], ['providers', 'Providers'], ['ghost-sentry', 'Ghost Sentry'], ['library', 'Library'], ['appearance', 'Appearance'], ['addons', 'Add-ons']]
 
   return (
     <main className="settings-page">
       <header className="page-heading"><div><span className="eyebrow">EV0L</span><h1>Settings</h1><p>Configure EV0L services, playback, library and appearance.</p></div><button className="button button--subtle" type="button" onClick={() => navigate(-1)}><Icon name="back" /> Back</button></header>
       {currentProfile && <ProfilePhotoSettings profile={currentProfile} onProfileUpdate={setCurrentProfile} />}
       <nav className="settings-tabs" aria-label="Settings sections">{tabs.map(([value, label]) => <TabButton key={value} label={label} selected={tab === value} onClick={() => selectTab(value)} />)}</nav>
-      <div className="settings-content">{tab === 'services' && renderServicesTab()}{tab === 'providers' && renderProvidersTab()}{tab === 'ghost-sentry' && renderGhostSentryTab()}{tab === 'library' && renderLibraryTab()}{tab === 'appearance' && renderAppearanceTab()}{tab === 'addons' && renderAddonsTab()}{tab === 'connect' && renderConnectTab()}</div>
+      <div className="settings-content">{tab === 'services' && renderServicesTab()}{tab === 'providers' && renderProvidersTab()}{tab === 'ghost-sentry' && renderGhostSentryTab()}{tab === 'library' && renderLibraryTab()}{tab === 'appearance' && renderAppearanceTab()}{tab === 'addons' && renderAddonsTab()}</div>
     </main>
   )
 }
