@@ -79,7 +79,7 @@ export default function ProfileCard({ profile, index = 0, protected: isProtected
     if (unlockTimerRef.current) window.clearTimeout(unlockTimerRef.current)
     unlockTimerRef.current = window.setTimeout(() => {
       onConnect()
-    }, 760)
+    }, 1050)
   }
 
   function activateFromCard(event: MouseEvent<HTMLElement>) {
