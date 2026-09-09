@@ -12,7 +12,7 @@ export default function EvolQrConnect() {
     QRCode.toDataURL(url, {
       errorCorrectionLevel: 'H',
       margin: 3,
-      width: 720,
+      width: 420,
       color: { dark: '#101010', light: '#e7e5de' },
     }).then((data) => {
       if (!cancelled) setQrData(data)
