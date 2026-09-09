@@ -45,10 +45,8 @@ export default function EvolQrConnect() {
         <div className="evol-qr-deaddrop__topline"><span>DEAD DROP // 001</span><span>AUTH: EV0L</span></div>
         <div className="evol-qr-deaddrop__code">
           {qrData ? <img src={qrData} alt="QR code for this EV0L address" /> : <div className="evol-qr-deaddrop__loading">GENERATING LINK</div>}
-          <span className="evol-qr-mark">EV0L</span>
         </div>
-        <div className="evol-qr-deaddrop__meta"><span>SCAN / CONNECT</span><span>NODE READY</span></div>
-        <div className="evol-qr-deaddrop__glitch" aria-hidden="true"><b /><i /><em /></div>
+        <div className="evol-qr-deaddrop__meta"><span>EV0L</span><span>SCAN / CONNECT</span><span>NODE READY</span></div>
       </div>
 
       <div className="evol-qr-connect__actions">
