@@ -1,6 +1,8 @@
 .guest-admin-lock {
-  min-height: calc(100vh - var(--header-h));
-  position: relative;
+  position: fixed;
+  z-index: 120;
+  inset: 0;
+  min-height: 100dvh;
   display: grid;
   place-items: center;
   padding: 70px 24px 100px;
