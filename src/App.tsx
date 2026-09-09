@@ -5,6 +5,7 @@ import PlayerPicker from './components/PlayerPicker'
 import ProfileGuardAgent from './components/ProfileGuardAgent'
 import SimklSyncAgent from './components/SimklSyncAgent'
 import StatusTextCleanup from './components/StatusTextCleanup'
+import WatchProgressAgent from './components/WatchProgressAgent'
 import { HomePage, IPTVPage, IPTVWatchPage, ListingPage, MyListPage, NotFoundPage, SearchPage, SportsPage, SportsWatchPage, StreamingPage, StatusPage, TitlePage, WatchPage } from './pages/Pages'
 import SettingsPage from './pages/SettingsPage'
 import SimklPage from './pages/SimklPage'
@@ -12,7 +13,7 @@ import './styles/globals.css'
 import './styles/viewport-fixes.css'
 
 export default function App() {
-  return <BrowserRouter><RootShell><AppDitherBackground/><ProfileGuardAgent/><PlayerPicker/><SimklSyncAgent/><StatusTextCleanup/><Routes>
+  return <BrowserRouter><RootShell><AppDitherBackground/><ProfileGuardAgent/><PlayerPicker/><SimklSyncAgent/><StatusTextCleanup/><WatchProgressAgent/><Routes>
     <Route path="/" element={<HomePage/>}/>
     <Route path="/movies" element={<ListingPage type="movie"/>}/>
     <Route path="/series" element={<ListingPage type="series"/>}/>
