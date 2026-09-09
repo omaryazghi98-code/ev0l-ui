@@ -12,7 +12,7 @@ export default function AppDitherBackground() {
         waveAmplitude={0.24}
         waveFrequency={2.6}
         waveSpeed={0.035}
-        enableMouseInteraction={false}
+        enableMouseInteraction
         mouseRadius={0.35}
       />
     </div>
