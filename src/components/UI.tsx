@@ -12,6 +12,7 @@ const icons: Record<string, ReactNode> = {
   user: <><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></>,
   sun: <><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></>,
   moon: <path d="M21 15a9 9 0 1 1-12-12 7 7 0 0 0 12 12z"/>,
+  lock: <><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></>,
   plus: <path d="M12 5v14M5 12h14"/>,
   check: <path d="m5 12 4 4L19 6"/>,
   play: <path d="m8 5 11 7-11 7z" fill="currentColor"/>,
