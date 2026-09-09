@@ -5,6 +5,7 @@ import { applyTheme, getTheme, loadProfiles, setActiveProfileId, STORAGE, type P
 import { Brand, Icon } from './UI'
 import ProfileUnlockGate from './ProfileUnlockGate'
 import ProfileCard from './ProfileCard'
+import ProfilePhotoSettings from './ProfilePhotoSettings'
 import LiquidEther from './LiquidEther'
 import GooeyNav from './GooeyNav'
 import '../styles/profile-picker.css'
@@ -106,7 +107,7 @@ export function ProfilePicker({ onSelect }: { onSelect: (profile: Profile) => vo
   )
 }
 
-export function AppShell({ profile, onSwitchProfile, children }: { profile: Profile; onSwitchProfile: () => void; children: ReactNode }) {
+export function AppShell({ profile, onProfileUpdate, onSwitchProfile, children }: { profile: Profile; onProfileUpdate: (profile: Profile) => void; onSwitchProfile: () => void; children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>(getTheme)
   const [profileOpen, setProfileOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
@@ -143,10 +144,10 @@ export function AppShell({ profile, onSwitchProfile, children }: { profile: Prof
     {!online && <div className="offline-banner"><Icon name="info"/>You're offline. Cached EV0L screens remain available; video playback requires a connection.</div>}
     <header className="site-header"><Brand compact/><GooeyNav className="site-gooey-nav" items={gooeyItems} particleCount={15} particleDistances={[90, 10]} particleR={100} initialActiveIndex={0} activeIndex={gooeyActiveIndex} animationTime={600} timeVariance={300} colors={[1, 2, 3, 1, 2, 3, 1, 4]} onItemClick={(item) => navigate(item.href)} />
       <div className="header-actions"><Link className="icon-button search-button" to="/search" aria-label="Search"><Icon name="search"/></Link><button className="icon-button theme-button" aria-label={`Use ${theme === 'dark' ? 'light' : 'dark'} theme`} onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}><Icon name={theme === 'dark' ? 'sun' : 'moon'}/></button>
-        <div className="profile-menu"><button className="profile-trigger" aria-expanded={profileOpen} onClick={() => setProfileOpen(!profileOpen)}><span>{profile.avatar || profile.name[0]}</span><b>{profile.name}</b><Icon name="arrow" size={15}/></button>{profileOpen && <div className="profile-popover"><div><span className="mini-avatar">{profile.avatar || profile.name[0]}</span><p><strong>{profile.name}</strong><small>Active profile</small></p></div><button onClick={onSwitchProfile}><Icon name="user"/>Switch profile</button><Link to="/status"><Icon name="info"/>System status</Link><Link to="/simkl"><Icon name="bookmark"/>Simkl</Link><button onClick={() => setSystemPowerOpen(true)}><Icon name="power"/>System power</button><button onClick={() => setHelpOpen(true)}><kbd>?</kbd>Keyboard shortcuts</button></div>}</div>
+        <div className="profile-menu"><button className="profile-trigger" aria-expanded={profileOpen} onClick={() => setProfileOpen(!profileOpen)}><span className={profile.avatar?.startsWith('data:image/') ? 'has-profile-image' : ''}>{profile.avatar?.startsWith('data:image/') ? <img src={profile.avatar} alt="" /> : profile.avatar || profile.name[0]}</span><b>{profile.name}</b><Icon name="arrow" size={15}/></button>{profileOpen && <div className="profile-popover"><div><span className="mini-avatar">{profile.avatar?.startsWith('data:image/') ? <img src={profile.avatar} alt="" /> : profile.avatar || profile.name[0]}</span><p><strong>{profile.name}</strong><small>Active profile</small></p></div><button onClick={onSwitchProfile}><Icon name="user"/>Switch profile</button><Link to="/status"><Icon name="info"/>System status</Link><Link to="/simkl"><Icon name="bookmark"/>Simkl</Link><button onClick={() => setSystemPowerOpen(true)}><Icon name="power"/>System power</button><button onClick={() => setHelpOpen(true)}><kbd>?</kbd>Keyboard shortcuts</button></div>}</div>
       </div>
     </header>
-    <div className="app-content">{children}</div>
+    <div className="app-content">{location.pathname === '/settings' && <ProfilePhotoSettings profile={profile} onProfileUpdate={onProfileUpdate} />}{children}</div>
     <nav className="mobile-nav" aria-label="Mobile navigation">{NAV.map((item) => <NavLink key={item.to} to={item.to} end={item.to === '/'}><Icon name={item.icon}/><span>{item.label.replace('Live TV', 'Live')}</span></NavLink>)}</nav>
     {systemPowerOpen && <div className="dialog-backdrop" role="presentation" onMouseDown={() => setSystemPowerOpen(false)}>
   <section className="shortcut-dialog system-power-dialog" role="dialog" aria-modal="true" onMouseDown={(e) => e.stopPropagation()}>
@@ -169,5 +170,5 @@ export function RootShell({ children }: { children: ReactNode }) {
   })
   function select(next: Profile) { setActiveProfileId(next.id); setProfile(next) }
   if (!profile) return <ProfilePicker onSelect={select}/>
-  return <AppShell profile={profile} onSwitchProfile={() => { localStorage.removeItem(STORAGE.activeProfile); setProfile(null) }}>{children}</AppShell>
+  return <AppShell profile={profile} onProfileUpdate={setProfile} onSwitchProfile={() => { localStorage.removeItem(STORAGE.activeProfile); setProfile(null) }}>{children}</AppShell>
 }
