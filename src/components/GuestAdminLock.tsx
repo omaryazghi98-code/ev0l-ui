@@ -37,6 +37,18 @@ export default function GuestAdminLock({
     return () => window.clearTimeout(timer)
   }, [])
 
+  useEffect(() => {
+    if (inline) return
+    const previousOverflow = document.body.style.overflow
+    const previousOverscroll = document.body.style.overscrollBehavior
+    document.body.style.overflow = 'hidden'
+    document.body.style.overscrollBehavior = 'none'
+    return () => {
+      document.body.style.overflow = previousOverflow
+      document.body.style.overscrollBehavior = previousOverscroll
+    }
+  }, [inline])
+
   async function unlock(event: FormEvent) {
     event.preventDefault()
     if (busy) return
@@ -71,6 +83,10 @@ export default function GuestAdminLock({
 
   const content = (
     <section className="guest-admin-lock__panel" aria-labelledby="guest-admin-lock-title">
+      <button className="guest-admin-lock__close" type="button" onClick={onBack} aria-label="Close owner controls">
+        <Icon name="close" size={20} />
+      </button>
+
       <div className="guest-admin-lock__eye" aria-hidden="true">
         <EvilEye
           eyeColor="#7F8B95"
