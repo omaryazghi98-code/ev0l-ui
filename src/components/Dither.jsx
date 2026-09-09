@@ -111,7 +111,7 @@ const float bayerMatrix8x8[64] = float[64](
   2.0/64.0, 50.0/64.0, 14.0/64.0, 62.0/64.0,  1.0/64.0,49.0/64.0, 13.0/64.0, 61.0/64.0,
   34.0/64.0,18.0/64.0, 46.0/64.0, 30.0/64.0, 33.0/64.0,17.0/64.0, 45.0/64.0, 29.0/64.0,
   10.0/64.0,58.0/64.0,  6.0/64.0, 54.0/64.0,  9.0/64.0,57.0/64.0,  5.0/64.0, 53.0/64.0,
-  42.0/64.0,26.0/64.0, 38.0/64.0, 22.0/64.0, 41.0/64.0,25.0/64.0, 37.0/64.0, 21.0/64.0
+  42.0/64.0,26.0/64.0, 38.0/64.0, 22.0/64.0, 41.0/64.0,25.0/64.0, 37.0/64.0,21.0/64.0
 );
 
 vec3 dither(vec2 uv, vec3 color) {
@@ -205,6 +205,20 @@ function DitheredWaves({
       res.set(w, h);
     }
   }, [size, gl]);
+
+  useEffect(() => {
+    if (!enableMouseInteraction) return undefined;
+    const handleWindowPointerMove = (event) => {
+      const rect = gl.domElement.getBoundingClientRect();
+      const dpr = gl.getPixelRatio();
+      mouseRef.current.set(
+        (event.clientX - rect.left) * dpr,
+        (event.clientY - rect.top) * dpr,
+      );
+    };
+    window.addEventListener('pointermove', handleWindowPointerMove, { passive: true });
+    return () => window.removeEventListener('pointermove', handleWindowPointerMove);
+  }, [enableMouseInteraction, gl]);
 
   const prevColor = useRef([...waveColor]);
   const prevBackgroundColor = useRef([...backgroundColor]);
