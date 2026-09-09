@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { EVOL_API_URL, CINEMETA } from '../config'
+import { EVOL_API_URL, CINEMETA_URL } from '../config'
 import {
   loadSettings, saveSettings, getServicesConfig, getProvidersStatus,
 } from '../lib/settings'
@@ -206,7 +206,7 @@ export default function SettingsPage() {
   }
 
   function testCinemeta() {
-    alert(`Cinemeta metadata service: ${CINEMETA}`)
+    alert(`Cinemeta metadata service: ${CINEMETA_URL}`)
   }
 
   function renderServicesTab() {
@@ -214,35 +214,12 @@ export default function SettingsPage() {
       <section>
         <h2>EV0L Services</h2>
         <div className="settings-section">
-          <div className="service-row" data-admin-only>
-            <span>API Base</span>
-            <input type="text" value={servicesConfig.apiBase} readOnly className="settings-input" />
-          </div>
-          <div className="service-row" data-admin-only>
-            <span>Power Server</span>
-            <input type="text" value={servicesConfig.powerBase} readOnly className="settings-input" />
-          </div>
-          <div className="service-row" data-admin-only>
-            <span>Cinemeta</span>
-            <input type="text" value={servicesConfig.cinemeta} readOnly className="settings-input" />
-            <button className="button button--subtle" onClick={testCinemeta} style={{ marginLeft: '0.5rem' }} data-admin-only>Info</button>
-          </div>
-          <div className="service-row" data-admin-only>
-            <span>CDN Live TV</span>
-            <input type="text" value={servicesConfig.cdnLiveTv} readOnly className="settings-input" />
-            <button className="button button--subtle" onClick={testCdnsports} style={{ marginLeft: '0.5rem' }} data-admin-only>Test</button>
-          </div>
-          <div className="service-row" data-admin-only>
-            <span>DLHD</span>
-            <input type="text" value={servicesConfig.dlhd} readOnly className="settings-input" />
-            <button className="button button--subtle" onClick={testDlhd} style={{ marginLeft: '0.5rem' }} data-admin-only>Test</button>
-          </div>
-          <div className="service-row" data-admin-only>
-            <span>Hyperbeam</span>
-            <input type="text" value={servicesConfig.hyperbeam} readOnly className="settings-input" />
-            <button className="button button--subtle" onClick={testHyperbeam} style={{ marginLeft: '0.5rem' }} data-admin-only>Status</button>
-            <small>report based on /api/health</small>
-          </div>
+          <div className="service-row" data-admin-only><span>API Base</span><input type="text" value={servicesConfig.apiBase} readOnly className="settings-input" /></div>
+          <div className="service-row" data-admin-only><span>Power Server</span><input type="text" value={servicesConfig.powerBase} readOnly className="settings-input" /></div>
+          <div className="service-row" data-admin-only><span>Cinemeta</span><input type="text" value={servicesConfig.cinemeta} readOnly className="settings-input" /><button className="button button--subtle" onClick={testCinemeta}>Info</button></div>
+          <div className="service-row" data-admin-only><span>CDN Live TV</span><input type="text" value={servicesConfig.cdnLiveTv} readOnly className="settings-input" /><button className="button button--subtle" onClick={testCdnsports}>Test</button></div>
+          <div className="service-row" data-admin-only><span>DLHD</span><input type="text" value={servicesConfig.dlhd} readOnly className="settings-input" /><button className="button button--subtle" onClick={testDlhd}>Test</button></div>
+          <div className="service-row" data-admin-only><span>Hyperbeam</span><input type="text" value={servicesConfig.hyperbeam} readOnly className="settings-input" /><button className="button button--subtle" onClick={testHyperbeam}>Status</button><small>report based on /api/health</small></div>
         </div>
       </section>
     )
@@ -255,10 +232,7 @@ export default function SettingsPage() {
         <h2>Providers</h2>
         <div className="settings-section">
           {providers.map((status, i) => (
-            <div key={i} className="provider-row" data-admin-only>
-              <span>{labels[i]}</span>
-              <span className={status === 'configured' ? 'status-dot status-dot--online' : 'status-dot status-dot--offline'}>{status}</span>
-            </div>
+            <div key={i} className="provider-row" data-admin-only><span>{labels[i]}</span><span className={status === 'configured' ? 'status-dot status-dot--online' : 'status-dot status-dot--offline'}>{status}</span></div>
           ))}
         </div>
       </section>
@@ -270,40 +244,7 @@ export default function SettingsPage() {
       <section data-admin-only>
         <h2>Ghost Sentry</h2>
         <div className="settings-section">
-          {ghostSentryBusy ? (
-            <p>Updating Ghost Sentry…</p>
-          ) : ghostSentryError ? (
-            <p>{ghostSentryError}</p>
-          ) : ghostSentry ? (
-            <div>
-              <small>{ghostSentry.enabled ? `ARMED • ${ghostSentry.idleMinutes} min idle • after ${String(ghostSentry.afterHour).padStart(2, '0')}:00` : 'DISABLED'}</small>
-              {ghostSentry.enabled && (
-                <div style={{ marginTop: '12px' }}>
-                  <small>Current idle: {ghostSentry.idleMinutes} min</small>
-                  <small>Action: {ghostSentry.action}</small>
-                </div>
-              )}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <button className="button button--subtle" onClick={handleGhostSentryToggle} disabled={ghostSentryBusy} data-admin-only>
-                  Disable Ghost Sentry
-                </button>
-                {ghostSentry && (
-                  <select data-admin-only>
-                    <option value="sleep">Sleep</option>
-                    <option value="shutdown">Shut down</option>
-                    <option value="restart">Restart</option>
-                  </select>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div>
-              <small>DISABLED</small>
-              <button className="button button--subtle" onClick={handleGhostSentryToggle} data-admin-only>
-                {ghostSentryBusy ? 'Updating' : 'Enable Ghost Sentry'}
-              </button>
-            </div>
-          )}
+          {ghostSentryBusy ? <p>Updating Ghost Sentry…</p> : ghostSentryError ? <p>{ghostSentryError}</p> : ghostSentry ? <div><small>{ghostSentry.enabled ? `ARMED • ${ghostSentry.idleMinutes} min idle • after ${String(ghostSentry.afterHour).padStart(2, '0')}:00` : 'DISABLED'}</small>{ghostSentry.enabled && <div style={{ marginTop: '12px' }}><small>Current idle: {ghostSentry.idleMinutes} min</small><small>Action: {ghostSentry.action}</small></div>}<div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}><button className="button button--subtle" onClick={handleGhostSentryToggle} disabled={ghostSentryBusy}>Disable Ghost Sentry</button><select><option value="sleep">Sleep</option><option value="shutdown">Shut down</option><option value="restart">Restart</option></select></div></div> : <div><small>DISABLED</small><button className="button button--subtle" onClick={handleGhostSentryToggle}>{ghostSentryBusy ? 'Updating' : 'Enable Ghost Sentry'}</button></div>}
         </div>
       </section>
     )
@@ -311,109 +252,30 @@ export default function SettingsPage() {
 
   function renderLibraryTab() {
     return (
-      <section>
-        <h2>Library</h2>
-        <div className="settings-section">
-          <div className="form-row">
-            <label>History item limit</label>
-            <input type="number" value={library.historyLimit} min="1" max="200" onChange={handleHistoryLimitChange} className="settings-input" />
-            <small>Maximum items in Continue Watching / My List history</small>
-          </div>
-          <button className="button button--subtle" onClick={() => { setLibrary({ historyLimit: 50 }); saveSettings({ library: { historyLimit: 50 } }) }}>Reset to defaults</button>
-        </div>
-      </section>
+      <section><h2>Library</h2><div className="settings-section"><div className="form-row"><label>History item limit</label><input type="number" value={library.historyLimit} min="1" max="200" onChange={handleHistoryLimitChange} className="settings-input"/><small>Maximum items in Continue Watching / My List history</small></div><button className="button button--subtle" onClick={() => { setLibrary({ historyLimit: 50 }); saveSettings({ library: { historyLimit: 50 } }) }}>Reset to defaults</button></div></section>
     )
   }
 
   function renderAppearanceTab() {
     return (
-      <section>
-        <h2>Appearance</h2>
-        <div className="settings-section">
-          <div className="form-row">
-            <label>Theme</label>
-            <select value={appearance.theme} onChange={handleThemeChange} className="settings-input">
-              <option value="light">Light</option>
-              <option value="dark">Dark</option>
-            </select>
-          </div>
-          <div className="form-row">
-            <label>Reduce motion</label>
-            <input type="checkbox" checked={appearance.motionReduce} onChange={handleMotionReduceChange} className="settings-input" />
-            <small>Reduce animation motion for accessibility</small>
-          </div>
-        </div>
-      </section>
+      <section><h2>Appearance</h2><div className="settings-section"><div className="form-row"><label>Theme</label><select value={appearance.theme} onChange={handleThemeChange} className="settings-input"><option value="light">Light</option><option value="dark">Dark</option></select></div><div className="form-row"><label>Reduce motion</label><input type="checkbox" checked={appearance.motionReduce} onChange={handleMotionReduceChange} className="settings-input"/><small>Reduce animation motion for accessibility</small></div></div></section>
     )
   }
 
   function renderAddonsTab() {
-    const addonSummaries = installedAddons.map((meta) => ({ id: meta.addonCatalogId, name: meta.name, source: meta.source }))
     return (
-      <section>
-        <h2>Installed Add-ons</h2>
-        <div className="settings-section">
-          {installedAddons.length === 0 ? <p>No add-ons installed. Add a manifest URL to discover catalogs.</p> : (
-            <div>
-              {installedAddons.map((meta, i) => (
-                <div key={i} className="provider-row">
-                  <span>{meta.name}</span>
-                  <span className={meta.source === 'stremio-addon' ? 'status-dot status-dot--online' : 'status-dot status-dot--offline'}>{meta.source}</span>
-                </div>
-              ))}
-            </div>
-          )}
-          <div style={{ marginTop: '16px' }}>
-            <h3>Add new add-on</h3>
-            <div className="form-row">
-              <input type="text" placeholder="Manifest URL (e.g. https://example.com/manifest.json)" ref={addonUrlRef} className="settings-input" />
-              <button className="button button--subtle" onClick={addAddonByUrl} disabled={addonBusy}>{addonBusy ? 'Adding…' : 'Add'}</button>
-            </div>
-            {addonError && <p>{addonError}</p>}
-          </div>
-        </div>
-      </section>
+      <section><h2>Installed Add-ons</h2><div className="settings-section">{installedAddons.length === 0 ? <p>No add-ons installed. Add a manifest URL to discover catalogs.</p> : <div>{installedAddons.map((meta, i) => <div key={i} className="provider-row"><span>{meta.name}</span><span className={meta.source === 'stremio-addon' ? 'status-dot status-dot--online' : 'status-dot status-dot--offline'}>{meta.source}</span></div>)}</div>}<div style={{ marginTop: '16px' }}><h3>Add new add-on</h3><div className="form-row"><input type="text" placeholder="Manifest URL (e.g. https://example.com/manifest.json)" ref={addonUrlRef} className="settings-input"/><button className="button button--subtle" onClick={addAddonByUrl} disabled={addonBusy}>{addonBusy ? 'Adding…' : 'Add'}</button></div>{addonError && <p>{addonError}</p>}</div></div></section>
     )
   }
 
-  const tabs: Array<[SettingsTab, string]> = [
-    ['services', 'Services'],
-    ['providers', 'Providers'],
-    ['ghost-sentry', 'Ghost Sentry'],
-    ['library', 'Library'],
-    ['appearance', 'Appearance'],
-    ['addons', 'Add-ons'],
-  ]
+  const tabs: Array<[SettingsTab, string]> = [['services', 'Services'], ['providers', 'Providers'], ['ghost-sentry', 'Ghost Sentry'], ['library', 'Library'], ['appearance', 'Appearance'], ['addons', 'Add-ons']]
 
   return (
     <main className="settings-page">
-      <header className="page-heading">
-        <div>
-          <span className="eyebrow">EV0L</span>
-          <h1>Settings</h1>
-          <p>Configure EV0L services, playback, library and appearance.</p>
-        </div>
-        <button className="button button--subtle" type="button" onClick={() => navigate(-1)}>
-          <Icon name="back" /> Back
-        </button>
-      </header>
-
+      <header className="page-heading"><div><span className="eyebrow">EV0L</span><h1>Settings</h1><p>Configure EV0L services, playback, library and appearance.</p></div><button className="button button--subtle" type="button" onClick={() => navigate(-1)}><Icon name="back" /> Back</button></header>
       {currentProfile && <ProfilePhotoSettings profile={currentProfile} onProfileUpdate={setCurrentProfile} />}
-
-      <nav className="settings-tabs" aria-label="Settings sections">
-        {tabs.map(([value, label]) => (
-          <TabButton key={value} label={label} selected={tab === value} onClick={() => selectTab(value)} />
-        ))}
-      </nav>
-
-      <div className="settings-content">
-        {tab === 'services' && renderServicesTab()}
-        {tab === 'providers' && renderProvidersTab()}
-        {tab === 'ghost-sentry' && renderGhostSentryTab()}
-        {tab === 'library' && renderLibraryTab()}
-        {tab === 'appearance' && renderAppearanceTab()}
-        {tab === 'addons' && renderAddonsTab()}
-      </div>
+      <nav className="settings-tabs" aria-label="Settings sections">{tabs.map(([value, label]) => <TabButton key={value} label={label} selected={tab === value} onClick={() => selectTab(value)} />)}</nav>
+      <div className="settings-content">{tab === 'services' && renderServicesTab()}{tab === 'providers' && renderProvidersTab()}{tab === 'ghost-sentry' && renderGhostSentryTab()}{tab === 'library' && renderLibraryTab()}{tab === 'appearance' && renderAppearanceTab()}{tab === 'addons' && renderAddonsTab()}</div>
     </main>
   )
 }
