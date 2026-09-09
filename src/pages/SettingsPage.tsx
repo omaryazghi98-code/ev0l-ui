@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { EVOL_API_URL, CINEMETA } from '../config'
 import {
   loadSettings, saveSettings, getServicesConfig, getProvidersStatus,
 } from '../lib/settings'
@@ -11,6 +12,9 @@ import {
   normalizeCinemetaMeta, mergeMetas as mergeMetasFn,
 } from '../lib/addonCatalogs'
 import type { NormalizedMetaPreview } from '../lib/normalizeMeta'
+import { Icon } from '../components/UI'
+import ProfilePhotoSettings from '../components/ProfilePhotoSettings'
+import { loadProfiles, STORAGE, type Profile } from '../lib/ev0l'
 
 type SettingsTab = 'services' | 'providers' | 'ghost-sentry' | 'library' | 'appearance' | 'addons'
 
@@ -35,6 +39,10 @@ export default function SettingsPage() {
   const [ghostSentry, setGhostSentryState] = useState(null)
   const [ghostSentryBusy, setGhostSentryBusy] = useState(false)
   const [ghostSentryError, setGhostSentryError] = useState('')
+  const [currentProfile, setCurrentProfile] = useState<Profile | null>(() => {
+    const id = localStorage.getItem(STORAGE.activeProfile)
+    return id ? loadProfiles().find((item) => item.id === id) || null : null
+  })
 
   // --- Add-ons state ---
   const [addonUrl, setAddonUrl] = useState('')
@@ -198,7 +206,7 @@ export default function SettingsPage() {
   }
 
   function testCinemeta() {
-    alert(`Cinemeta metadata service: ${CINEMETA_URL}`)
+    alert(`Cinemeta metadata service: ${CINEMETA}`)
   }
 
   function renderServicesTab() {
@@ -389,6 +397,8 @@ export default function SettingsPage() {
           <Icon name="back" /> Back
         </button>
       </header>
+
+      {currentProfile && <ProfilePhotoSettings profile={currentProfile} onProfileUpdate={setCurrentProfile} />}
 
       <nav className="settings-tabs" aria-label="Settings sections">
         {tabs.map(([value, label]) => (
