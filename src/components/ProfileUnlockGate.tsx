@@ -5,6 +5,10 @@ import '../styles/profile-lock.css'
 
 type Props = { profile: Profile; onCancel: () => void; onUnlock: (pin: string) => Promise<boolean> | boolean }
 
+function isImageAvatar(avatar?: string) {
+  return Boolean(avatar?.startsWith('data:image/'))
+}
+
 export default function ProfileUnlockGate({ profile, onCancel, onUnlock }: Props) {
   const [pin, setPin] = useState('')
   const [offset, setOffset] = useState({ x: 0, y: 0 })
@@ -58,6 +62,8 @@ export default function ProfileUnlockGate({ profile, onCancel, onUnlock }: Props
     } finally { setBusy(false) }
   }
 
+  const imageAvatar = isImageAvatar(profile.avatar)
+
   return (
     <div className="profile-lock" role="presentation" onMouseDown={onCancel}>
       <section className={`profile-lock__card${shake ? ' profile-lock__card--shake' : ''}`} role="dialog" aria-modal="true" aria-labelledby="profile-lock-title" onMouseDown={(event) => event.stopPropagation()}>
@@ -65,7 +71,9 @@ export default function ProfileUnlockGate({ profile, onCancel, onUnlock }: Props
         <div className="profile-lock__ambient profile-lock__ambient--two" />
         <header className="profile-lock__top">
           <div className="profile-lock__identity">
-            <span className="profile-lock__avatar">{profile.avatar || profile.name[0]}</span>
+            <span className={`profile-lock__avatar${imageAvatar ? ' has-image' : ''}`}>
+              {imageAvatar ? <img src={profile.avatar} alt="" /> : (profile.avatar || profile.name[0])}
+            </span>
             <div><span className="eyebrow">Protected profile</span><strong>{profile.name}</strong></div>
           </div>
           <button className="icon-button" type="button" onClick={onCancel} aria-label="Cancel"><Icon name="close" /></button>
