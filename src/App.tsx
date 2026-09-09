@@ -8,6 +8,7 @@ import { HomePage, IPTVPage, IPTVWatchPage, ListingPage, MyListPage, NotFoundPag
 import SettingsPage from './pages/SettingsPage'
 import SimklPage from './pages/SimklPage'
 import './styles/globals.css'
+import './styles/viewport-fixes.css'
 
 export default function App() {
   return <BrowserRouter><RootShell><AppDitherBackground/><ProfileGuardAgent/><PlayerPicker/><SimklSyncAgent/><Routes>
