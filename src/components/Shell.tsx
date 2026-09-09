@@ -6,6 +6,7 @@ import { Brand, Icon } from './UI'
 import ProfileUnlockGate from './ProfileUnlockGate'
 import ProfileCard from './ProfileCard'
 import LiquidEther from './LiquidEther'
+import GooeyNav from './GooeyNav'
 import '../styles/profile-picker.css'
 
 const NAV = [
@@ -135,9 +136,12 @@ export function AppShell({ profile, onSwitchProfile, children }: { profile: Prof
     return () => window.removeEventListener('keydown', shortcuts)
   }, [navigate])
 
+  const gooeyItems = NAV.map(({ to, label }) => ({ href: to, label }))
+  const gooeyActiveIndex = NAV.findIndex((item) => item.to === location.pathname)
+
   return <div className="app-shell">
     {!online && <div className="offline-banner"><Icon name="info"/>You're offline. Cached EV0L screens remain available; video playback requires a connection.</div>}
-    <header className="site-header"><Brand compact/><nav className="desktop-nav" aria-label="Primary navigation">{NAV.map((item) => <NavLink key={item.to} to={item.to} end={item.to === '/'}>{item.label}</NavLink>)}</nav>
+    <header className="site-header"><Brand compact/><GooeyNav className="site-gooey-nav" items={gooeyItems} particleCount={15} particleDistances={[90, 10]} particleR={100} initialActiveIndex={0} activeIndex={gooeyActiveIndex} animationTime={600} timeVariance={300} colors={[1, 2, 3, 1, 2, 3, 1, 4]} onItemClick={(item) => navigate(item.href)} />
       <div className="header-actions"><Link className="icon-button search-button" to="/search" aria-label="Search"><Icon name="search"/></Link><button className="icon-button theme-button" aria-label={`Use ${theme === 'dark' ? 'light' : 'dark'} theme`} onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}><Icon name={theme === 'dark' ? 'sun' : 'moon'}/></button>
         <div className="profile-menu"><button className="profile-trigger" aria-expanded={profileOpen} onClick={() => setProfileOpen(!profileOpen)}><span>{profile.avatar || profile.name[0]}</span><b>{profile.name}</b><Icon name="arrow" size={15}/></button>{profileOpen && <div className="profile-popover"><div><span className="mini-avatar">{profile.avatar || profile.name[0]}</span><p><strong>{profile.name}</strong><small>Active profile</small></p></div><button onClick={onSwitchProfile}><Icon name="user"/>Switch profile</button><Link to="/status"><Icon name="info"/>System status</Link><Link to="/simkl"><Icon name="bookmark"/>Simkl</Link><button onClick={() => setSystemPowerOpen(true)}><Icon name="power"/>System power</button><button onClick={() => setHelpOpen(true)}><kbd>?</kbd>Keyboard shortcuts</button></div>}</div>
       </div>
